@@ -4,25 +4,30 @@ import pytest
 
 from app.core.exceptions import LLMConfigurationError
 from app.modules.llm.interface import LLMMessage, LLMRequest
-from app.modules.llm.providers.gemini import GeminiProvider
+from app.modules.llm.providers.groq import GroqProvider
 
 
-def test_gemini_provider_requires_api_key() -> None:
-    provider = GeminiProvider(api_key=None)
+def test_groq_provider_requires_api_key() -> None:
+    provider = GroqProvider(api_key=None)
 
     with pytest.raises(LLMConfigurationError, match="API key is not configured"):
         provider.generate(make_request())
 
 
-def test_gemini_provider_defaults() -> None:
-    provider = GeminiProvider()
-    assert provider.name == "gemini"
-    assert provider.default_model == "gemini-2.5-flash"
+def test_groq_provider_defaults() -> None:
+    provider = GroqProvider()
+    assert provider.name == "groq"
+    assert provider.default_model == "llama-3.3-70b-versatile"
     assert provider.timeout_seconds == 60
 
 
-def test_gemini_provider_convert_messages() -> None:
-    provider = GeminiProvider(api_key="key")
+def test_groq_provider_custom_name() -> None:
+    provider = GroqProvider(name="groq-2", api_key="key")
+    assert provider.name == "groq-2"
+
+
+def test_groq_provider_convert_messages() -> None:
+    provider = GroqProvider(api_key="key")
     messages = [
         LLMMessage(role="system", content="Be useful."),
         LLMMessage(role="user", content="Hello"),
@@ -37,21 +42,8 @@ def test_gemini_provider_convert_messages() -> None:
     assert langchain_msgs[2].content == "Hi there!"
 
 
-def test_gemini_provider_convert_messages_preserves_order() -> None:
-    provider = GeminiProvider(api_key="key")
-    messages = [
-        LLMMessage(role="user", content="First"),
-        LLMMessage(role="assistant", content="Second"),
-        LLMMessage(role="user", content="Third"),
-    ]
-
-    langchain_msgs = provider._convert_messages(messages)
-
-    assert [msg.content for msg in langchain_msgs] == ["First", "Second", "Third"]
-
-
-def test_gemini_provider_convert_empty_messages() -> None:
-    provider = GeminiProvider(api_key="key")
+def test_groq_provider_convert_empty_messages() -> None:
+    provider = GroqProvider(api_key="key")
 
     langchain_msgs = provider._convert_messages([])
 

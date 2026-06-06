@@ -1,25 +1,3 @@
-<<<<<<< HEAD
-# Virtual Environments
-.venv/
-env/
-venv/
-
-# Caches
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Coverage Reports
-.coverage
-htmlcov/
-coverage.xml
-
-# Output / Data
-parsed.json
-=======
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -238,4 +216,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
->>>>>>> bd4e54d295b6f204cc82a2070f78e6b5bde552cf
+
+parsed.json
