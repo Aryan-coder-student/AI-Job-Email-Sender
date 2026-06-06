@@ -1,3 +1,24 @@
+# Virtual Environments
+.venv/
+env/
+venv/
+
+# Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage Reports
+.coverage
+htmlcov/
+coverage.xml
+
+# Output / Data
+parsed.json
+=======
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -215,4 +236,7 @@ marimo/_lsp/
 __marimo__/
 
 # Streamlit
+
+parse.json
 .streamlit/secrets.toml
+
