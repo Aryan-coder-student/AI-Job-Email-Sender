@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Virtual Environments
 .venv/
 env/
@@ -237,5 +237,7 @@ marimo/_lsp/
 __marimo__/
 
 # Streamlit
+
+parse.json
 .streamlit/secrets.toml
->>>>>>> bd4e54d295b6f204cc82a2070f78e6b5bde552cf
+
