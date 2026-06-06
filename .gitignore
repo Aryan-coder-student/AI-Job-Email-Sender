@@ -18,7 +18,6 @@ coverage.xml
 
 # Output / Data
 parsed.json
-=======
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -238,5 +237,5 @@ __marimo__/
 # Streamlit
 
 parse.json
+parsed.json
 .streamlit/secrets.toml
-
