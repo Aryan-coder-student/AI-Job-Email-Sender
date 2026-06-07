@@ -17,8 +17,8 @@ def test_resume_parser_config_defaults() -> None:
 
     assert config.allowed_extensions == (".txt", ".pdf", ".docx")
     assert config.max_file_size_bytes == 5 * 1024 * 1024
-    assert config.max_cleaned_text_chars == 20_000
-    assert config.llm_max_tokens == 1800
+    assert config.max_cleaned_text_chars == 200_000
+    assert config.llm_max_tokens == 3000
 
 
 @pytest.mark.parametrize(

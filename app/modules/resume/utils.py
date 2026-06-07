@@ -10,7 +10,14 @@ from langchain_core.output_parsers import PydanticOutputParser
 from app.core.exceptions import InvalidResumeError
 from app.modules.llm.interface import LLMMessage, LLMRequest
 from app.modules.resume.config import ResumeParserConfig
-from app.modules.resume.schema import ParsedResume, ResumeLinks
+from app.modules.resume.schema import (
+    ParsedResume,
+    ResumeLinks,
+    ResumeExperience,
+    ResumeProject,
+    ResumeCourse,
+    ResumeCertification,
+)
 from setting import RESUME_SECTION_ALIASES
 
 
@@ -23,6 +30,24 @@ class ResumeLinksSchema(BaseModel):
     urls: list[str] = Field(default_factory=list)
 
 
+class ExperienceSchema(BaseModel):
+    company_name: str | None = Field(default=None, description="Company or organization name.")
+    date: str | None = Field(default=None, description="Range of dates, e.g. '1/2022 - 4/2022'.")
+    description: str | None = Field(default=None, description="Full bullet point descriptions of responsibilities.")
+
+class ProjectSchema(BaseModel):
+    project_name: str | None = Field(default=None, description="Project name.")
+    link: str | None = Field(default=None, description="Link or URL to the project if available.")
+    description: str | None = Field(default=None, description="Full description of the project.")
+
+class CourseSchema(BaseModel):
+    name: str | None = Field(default=None, description="Name of the course.")
+    description: str | None = Field(default=None, description="Description of the course if available.")
+
+class CertificationSchema(BaseModel):
+    name: str | None = Field(default=None, description="Name of the certification.")
+    link: str | None = Field(default=None, description="Link or URL to the certificate if available.")
+
 class ResumeStructureSchema(BaseModel):
     candidate_name: str | None = Field(
         default=None, description="Candidate name exactly as shown in the resume."
@@ -33,13 +58,21 @@ class ResumeStructureSchema(BaseModel):
     skills: list[str] = Field(
         default_factory=list, description="List of individual skills."
     )
-    experience: list[str] = Field(
+    experience: list[ExperienceSchema] = Field(
         default_factory=list, 
-        description="List of work experiences. Each string MUST include the job title, company, dates, AND the full bullet point descriptions of responsibilities."
+        description="List of work experiences."
     )
-    projects: list[str] = Field(
+    projects: list[ProjectSchema] = Field(
         default_factory=list, 
-        description="List of projects. Each string MUST include the project name and the full description."
+        description="List of projects."
+    )
+    courses: list[CourseSchema] = Field(
+        default_factory=list, 
+        description="List of courses."
+    )
+    certifications: list[CertificationSchema] = Field(
+        default_factory=list, 
+        description="List of certifications."
     )
     achievements: list[str] = Field(
         default_factory=list, 
@@ -137,6 +170,36 @@ def build_parsed_resume_from_structure(
     metadata: dict[str, Any] | None = None,
 ) -> ParsedResume:
     links = _normalise_links(structure.get("links"))
+    
+    experiences = []
+    for exp in structure.get("experience", []):
+        experiences.append(ResumeExperience(
+            company_name=_string_or_none(exp.get("company_name")),
+            date=_string_or_none(exp.get("date")),
+            description=_string_or_none(exp.get("description")),
+        ))
+
+    projects = []
+    for proj in structure.get("projects", []):
+        projects.append(ResumeProject(
+            project_name=_string_or_none(proj.get("project_name")),
+            link=_string_or_none(proj.get("link")),
+            description=_string_or_none(proj.get("description")),
+        ))
+
+    courses = []
+    for course in structure.get("courses", []):
+        courses.append(ResumeCourse(
+            name=_string_or_none(course.get("name")),
+            description=_string_or_none(course.get("description")),
+        ))
+
+    certifications = []
+    for cert in structure.get("certifications", []):
+        certifications.append(ResumeCertification(
+            name=_string_or_none(cert.get("name")),
+            link=_string_or_none(cert.get("link")),
+        ))
 
     return ParsedResume(
         filename=filename,
@@ -145,8 +208,10 @@ def build_parsed_resume_from_structure(
         candidate_name=_string_or_none(structure.get("candidate_name")),
         summary=_string_or_empty(structure.get("summary")),
         skills=_string_list(structure.get("skills")),
-        experience=_string_list(structure.get("experience")),
-        projects=_string_list(structure.get("projects")),
+        experience=experiences,
+        projects=projects,
+        courses=courses,
+        certifications=certifications,
         achievements=_string_list(structure.get("achievements")),
         research=_string_list(structure.get("research")),
         education=_string_list(structure.get("education")),
@@ -170,6 +235,8 @@ def build_text_only_resume(
         skills=[],
         experience=[],
         projects=[],
+        courses=[],
+        certifications=[],
         achievements=[],
         research=[],
         education=[],
