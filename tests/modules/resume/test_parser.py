@@ -53,8 +53,10 @@ class FakeResumeRouter:
                     "candidate_name": "Aryan Pahari",
                     "summary": "Backend engineer building AI job automation tools.",
                     "skills": ["Python", "FastAPI"],
-                    "experience": ["Backend Engineer"],
-                    "projects": ["AI Job Email Agent"],
+                    "experience": [{"company_name": "Acme", "date": "1/2022 - 4/2022", "description": "Backend Engineer"}],
+                    "projects": [{"project_name": "AI Job Email Agent", "link": None, "description": "built it"}],
+                    "courses": [{"name": "AI Course", "description": "learned AI"}],
+                    "certifications": [{"name": "AWS Certified", "link": "link"}],
                     "achievements": ["Won a national hackathon"],
                     "research": ["Worked on RAG evaluation for job matching"],
                     "education": ["B.Tech Computer Science"],
@@ -105,8 +107,11 @@ def test_parse_resume_from_upload_uses_llm_router_for_structured_output() -> Non
     assert parsed_resume.candidate_name == "Aryan Pahari"
     assert parsed_resume.summary == "Backend engineer building AI job automation tools."
     assert parsed_resume.skills == ["Python", "FastAPI"]
-    assert parsed_resume.experience == ["Backend Engineer"]
-    assert parsed_resume.projects == ["AI Job Email Agent"]
+    assert parsed_resume.experience[0].company_name == "Acme"
+    assert parsed_resume.experience[0].description == "Backend Engineer"
+    assert parsed_resume.projects[0].project_name == "AI Job Email Agent"
+    assert parsed_resume.courses[0].name == "AI Course"
+    assert parsed_resume.certifications[0].name == "AWS Certified"
     assert parsed_resume.achievements == ["Won a national hackathon"]
     assert parsed_resume.research == ["Worked on RAG evaluation for job matching"]
     assert parsed_resume.education == ["B.Tech Computer Science"]

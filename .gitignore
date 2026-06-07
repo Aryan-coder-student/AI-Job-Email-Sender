@@ -238,5 +238,6 @@ __marimo__/
 
 parse.json
 parsed.json
+parse_resume.json
 .streamlit/secrets.toml
-sample/.
+sample

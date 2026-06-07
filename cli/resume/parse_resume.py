@@ -48,8 +48,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--llm-max-tokens",
         type=positive_int,
-        default=1800,
-        help="Maximum output tokens for the LLM. Defaults to 1800.",
+        default=3000,
+        help="Maximum output tokens for the LLM. Defaults to 3000.",
     )
     parser.add_argument(
         "--output-file",
