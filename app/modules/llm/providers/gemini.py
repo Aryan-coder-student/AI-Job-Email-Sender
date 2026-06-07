@@ -29,6 +29,7 @@ class GeminiProvider:
                 temperature=request.temperature,
                 max_output_tokens=request.max_tokens,
                 timeout=self.timeout_seconds,
+                response_mime_type=_response_mime_type(request.response_format),
             )
 
             langchain_messages = self._convert_messages(request.messages)
@@ -56,7 +57,7 @@ class GeminiProvider:
             if response.response_metadata
             else None,
             usage=usage,
-            raw_response=response.dict(),
+            raw_response=response.model_dump(),
         )
 
     def _convert_messages(self, messages: list[LLMMessage]) -> list[BaseMessage]:
@@ -69,3 +70,10 @@ class GeminiProvider:
             elif msg.role == "assistant":
                 langchain_messages.append(AIMessage(content=msg.content))
         return langchain_messages
+
+
+def _response_mime_type(response_format: dict[str, object] | None) -> str | None:
+    if response_format and response_format.get("type") == "json_object":
+        return "application/json"
+
+    return None
