@@ -61,7 +61,7 @@ class OpenAIProvider:
             if response.response_metadata
             else None,
             usage=usage,
-            raw_response=response.dict(),
+            raw_response=response.model_dump(),
         )
 
     def _convert_messages(self, messages: list[LLMMessage]) -> list[BaseMessage]:

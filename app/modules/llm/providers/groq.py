@@ -30,6 +30,9 @@ class GroqProvider:
                 temperature=request.temperature,
                 max_tokens=request.max_tokens,
                 timeout=self.timeout_seconds,
+                model_kwargs=request.response_format
+                and {"response_format": request.response_format}
+                or {},
             )
 
             langchain_messages = self._convert_messages(request.messages)
@@ -42,20 +45,22 @@ class GroqProvider:
             ) from error
 
         usage_metadata = response.usage_metadata or {}
-        
+
         usage = {
             "promptTokenCount": usage_metadata.get("input_tokens", 0),
             "candidatesTokenCount": usage_metadata.get("output_tokens", 0),
-            "totalTokenCount": usage_metadata.get("total_tokens", 0)
+            "totalTokenCount": usage_metadata.get("total_tokens", 0),
         }
 
         return LLMResponse(
             content=str(response.content),
             provider=self.name,
             model=model_name,
-            finish_reason=response.response_metadata.get("finish_reason") if response.response_metadata else None,
+            finish_reason=response.response_metadata.get("finish_reason")
+            if response.response_metadata
+            else None,
             usage=usage,
-            raw_response=response.dict(),
+            raw_response=response.model_dump(),
         )
 
     def _convert_messages(self, messages: list[LLMMessage]) -> list[BaseMessage]:

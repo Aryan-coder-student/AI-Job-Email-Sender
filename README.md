@@ -56,7 +56,10 @@ lower the threshold, for example `--max-empty-ratio 0.75`. To keep sparse rows, 
 Environment variables:
 
 ```bash
-GROQ_API_KEY=
+GROQ_API_KEY_1=
+GROQ_API_KEY_2=
+GROQ_API_KEY_3=
+GROQ_API_KEY_4=
 GROQ_MODEL=
 OPENAI_API_KEY=
 OPENAI_MODEL=
@@ -83,5 +86,60 @@ response = router.generate(
 print(response.provider, response.content)
 ```
 
-Provider order is Groq, OpenAI, then Gemini. If a provider returns a rate-limit response,
-the router pauses it temporarily and tries the next provider.
+Provider order is Groq keys 1-4, OpenAI, then Gemini. If a provider returns a
+rate-limit response, the router pauses it temporarily and tries the next provider.
+
+## Resume Parser
+
+Supported resume file types:
+
+```txt
+.txt
+.pdf
+.docx
+```
+
+Dependencies:
+
+```txt
+langchain
+pypdf
+python-docx
+```
+
+Basic usage:
+
+```python
+from app.modules.llm.factory import build_default_llm_router
+from app.modules.resume.parser import parse_resume_from_path
+
+router = build_default_llm_router()
+resume = parse_resume_from_path("./resume.pdf", llm_router=router)
+print(resume.candidate_name)
+print(resume.skills)
+print(resume.links.github)
+```
+
+The parser extracts and cleans resume text locally (including embedded PDF hyperlinks), prepares a strict Pydantic schema using LangChain's `PydanticOutputParser` for structured output, then asks the configured LLM router to return structured JSON. Structured fields include candidate name, summary, skills, experience, projects, achievements, research work, education, emails, phones, GitHub, LinkedIn, portfolio, and URLs.
+
+If you call the parser without `llm_router`, it still validates the file and returns the
+cleaned raw text, but structured fields stay empty. This is useful for testing upload and
+text extraction without spending LLM tokens.
+
+## Resume Parser CLI
+
+Parse a local resume file and print the extracted JSON structure:
+
+```bash
+.venv/bin/python -m cli.resume.parse_resume ./resume.pdf
+```
+
+Useful options:
+
+```bash
+.venv/bin/python -m cli.resume.parse_resume ./resume.pdf \
+  --output-file parsed.json \
+  --text-only
+```
+
+Use `--text-only` to skip LLM processing and only extract raw text and metadata.

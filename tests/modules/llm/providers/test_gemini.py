@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from langchain_core.messages import AIMessage
 
 from app.core.exceptions import LLMConfigurationError
 from app.modules.llm.interface import LLMMessage, LLMRequest
@@ -56,6 +57,34 @@ def test_gemini_provider_convert_empty_messages() -> None:
     langchain_msgs = provider._convert_messages([])
 
     assert langchain_msgs == []
+
+
+def test_gemini_provider_passes_json_response_mime_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_kwargs: dict[str, object] = {}
+
+    class FakeChatGoogleGenerativeAI:
+        def __init__(self, **kwargs: object) -> None:
+            captured_kwargs.update(kwargs)
+
+        def invoke(self, messages: object) -> AIMessage:
+            return AIMessage(content="{}")
+
+    monkeypatch.setattr(
+        "app.modules.llm.providers.gemini.ChatGoogleGenerativeAI",
+        FakeChatGoogleGenerativeAI,
+    )
+
+    provider = GeminiProvider(api_key="key")
+    provider.generate(
+        LLMRequest(
+            messages=[LLMMessage(role="user", content="Return JSON.")],
+            response_format={"type": "json_object"},
+        )
+    )
+
+    assert captured_kwargs["response_mime_type"] == "application/json"
 
 
 def make_request() -> LLMRequest:
