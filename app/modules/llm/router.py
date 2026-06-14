@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -33,27 +34,30 @@ class LLMRouter:
             provider.name: LLMProviderState()
             for provider in providers
         }
+        self._state_lock = threading.Lock()
 
     def generate(self, request: LLMRequest) -> LLMResponse:
         request.validate()
         last_error: Exception | None = None
 
         for provider in self.providers:
-            state = self.provider_states[provider.name]
-
-            if state.is_paused():
-                continue
+            with self._state_lock:
+                state = self.provider_states[provider.name]
+                if state.is_paused():
+                    continue
 
             try:
                 return provider.generate(request)
             except LLMRateLimitError as error:
                 last_error = error
-                self.pause_provider(provider.name, error.retry_after_seconds)
-                state.last_error = str(error)
+                with self._state_lock:
+                    self.pause_provider(provider.name, error.retry_after_seconds)
+                    self.provider_states[provider.name].last_error = str(error)
                 continue
             except LLMError as error:
                 last_error = error
-                state.last_error = str(error)
+                with self._state_lock:
+                    self.provider_states[provider.name].last_error = str(error)
                 continue
 
         if last_error:
@@ -72,4 +76,5 @@ class LLMRouter:
         )
 
     def reset_provider(self, provider_name: str) -> None:
-        self.provider_states[provider_name] = LLMProviderState()
+        with self._state_lock:
+            self.provider_states[provider_name] = LLMProviderState()
