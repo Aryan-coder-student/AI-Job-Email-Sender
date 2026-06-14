@@ -6,17 +6,12 @@ import json
 import sys
 from pathlib import Path
 from typing import Any, Sequence
-import dotenv
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-from app.core.exceptions import AppError  # noqa: E402
-from app.modules.llm.factory import build_default_llm_router  # noqa: E402
-from app.modules.resume.config import ResumeParserConfig  # noqa: E402
-from app.modules.resume.parser import parse_resume_from_path  # noqa: E402
-from setting import RESUME_ALLOWED_EXTENSIONS  # noqa: E402
+from cli.bootstrap import bootstrap_cli
+from app.core.exceptions import AppError
+from app.modules.llm.factory import build_default_llm_router
+from app.modules.resume.config import ResumeParserConfig
+from app.modules.resume.parser import parse_resume_from_path
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -67,7 +62,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def build_config(args: argparse.Namespace) -> ResumeParserConfig:
     return ResumeParserConfig(
-        allowed_extensions=RESUME_ALLOWED_EXTENSIONS,
         max_file_size_bytes=int(args.max_file_size_mb * 1024 * 1024),
         max_cleaned_text_chars=args.max_cleaned_text_chars,
         llm_max_tokens=args.llm_max_tokens,
@@ -114,7 +108,7 @@ def positive_float(value: str) -> float:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    dotenv.load_dotenv()
+    bootstrap_cli()
 
     parser = build_arg_parser()
     args = parser.parse_args(argv)

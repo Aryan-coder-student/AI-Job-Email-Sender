@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from setting import LOG_FILE_ENV, LOG_LEVEL_ENV, get_env
+from app.core.settings import get_settings
+from app.core.string_normalizers import string_or_none
 
 DEFAULT_LOG_LEVEL = "INFO"
 
@@ -14,10 +15,7 @@ class LoggingConfig:
 
     @classmethod
     def from_env(cls) -> LoggingConfig:
-        level = get_env(LOG_LEVEL_ENV, DEFAULT_LOG_LEVEL)
-        log_file = get_env(LOG_FILE_ENV)
-
-        normalized_level = level.strip() if isinstance(level, str) and level.strip() else DEFAULT_LOG_LEVEL
-        normalized_log_file = log_file.strip() if isinstance(log_file, str) and log_file.strip() else None
-
-        return cls(level=normalized_level, log_file=normalized_log_file)
+        settings = get_settings()
+        level = string_or_none(settings.log_level) or DEFAULT_LOG_LEVEL
+        log_file = string_or_none(settings.log_file)
+        return cls(level=level, log_file=log_file)

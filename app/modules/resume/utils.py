@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any
 
 from app.core.exceptions import InvalidResumeError
 from app.core.logger import get_logger
 from app.core.string_normalizers import string_list, string_or_empty, string_or_none
+from app.core.text import clean_document_text, truncate_document_text
 from app.modules.llm.interface import LLMMessage, LLMRequest
 from app.modules.resume.config import ResumeParserConfig
 from app.modules.resume.model import (
@@ -18,18 +18,14 @@ from app.modules.resume.model import (
     ResumeProject,
     resume_parser,
 )
-from app.modules.resume.prompt import RESUME_SYSTEM_PROMPT, build_resume_user_prompt
-from setting import RESUME_SECTION_ALIASES
+from app.modules.resume.prompt_builder import build_resume_user_prompt
+from prompts.resume.parse import RESUME_SYSTEM_PROMPT
 
 logger = get_logger(__name__)
 
 
 def clean_resume_text(raw_text: str) -> str:
-    text = raw_text.replace("\x00", " ")
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    return clean_document_text(raw_text)
 
 
 def split_resume_lines(raw_text: str) -> list[str]:
@@ -37,12 +33,7 @@ def split_resume_lines(raw_text: str) -> list[str]:
 
 
 def truncate_resume_text(raw_text: str, max_chars: int) -> str:
-    cleaned_text = clean_resume_text(raw_text)
-
-    if len(cleaned_text) <= max_chars:
-        return cleaned_text
-
-    return cleaned_text[:max_chars].rstrip()
+    return truncate_document_text(raw_text, max_chars)
 
 
 def build_resume_structure_request(
@@ -50,7 +41,7 @@ def build_resume_structure_request(
     config: ResumeParserConfig,
 ) -> LLMRequest:
     resume_text = cleaned_text[: config.max_cleaned_text_chars]
-    section_aliases_json = json.dumps(RESUME_SECTION_ALIASES, indent=2)
+    section_aliases_json = json.dumps(config.section_aliases, indent=2)
     user_prompt = build_resume_user_prompt(
         resume_text=resume_text,
         section_aliases_json=section_aliases_json,

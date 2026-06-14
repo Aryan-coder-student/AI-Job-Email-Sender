@@ -25,16 +25,7 @@ Rules:
 Repository name: {repo_name}
 """.strip()
 
-
-def build_github_user_prompt(
-    *,
-    repo_name: str,
-    readme_text: str,
-    format_instructions: str,
-) -> str:
-    rules = GITHUB_USER_PROMPT_RULES.format(repo_name=repo_name)
-
-    return f"""
+GITHUB_USER_PROMPT = """
 {rules}
 
 {format_instructions}

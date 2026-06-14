@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from app.modules.github.prompt import (
-    GITHUB_SYSTEM_PROMPT,
-    GITHUB_USER_PROMPT_RULES,
-    build_github_user_prompt,
-)
+from app.modules.github.prompt_builder import build_github_user_prompt
+from prompts.github.parse import GITHUB_SYSTEM_PROMPT, GITHUB_USER_PROMPT_RULES
 
 
 def test_github_system_prompt_encourages_inference_from_readme() -> None:

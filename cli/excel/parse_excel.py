@@ -8,11 +8,7 @@ from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlparse
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
+from cli.bootstrap import bootstrap_cli
 from app.core.exceptions import AppError
 from app.modules.excel.config import ExcelParserConfig
 from app.modules.excel.parser import ParsedExcelWorkbook
@@ -204,6 +200,7 @@ def ratio(value: str) -> float:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    bootstrap_cli()
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
