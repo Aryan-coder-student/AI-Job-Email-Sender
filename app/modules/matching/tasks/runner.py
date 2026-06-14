@@ -10,13 +10,19 @@ from app.modules.matching.ranker import rank_projects_for_employer
 
 def run_rank_applications(
     *,
-    companies: str | Path,
+    companies: str | Path | None = None,
+    company_records: list[dict[str, Any]] | None = None,
     company: str,
     candidate_id: str,
     job_url: str | None = None,
     top: int = 5,
 ) -> list[dict[str, Any]]:
-    records = load_json_file(str(companies))
+    if company_records is not None:
+        records = company_records
+    elif companies is not None:
+        records = load_json_file(str(companies))
+    else:
+        raise ValueError("companies path or company_records is required.")
     matches = [
         record
         for record in records
