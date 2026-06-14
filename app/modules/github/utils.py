@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 from urllib.parse import urlparse
 
 from app.core.exceptions import InvalidGitHubError
 from app.core.logger import get_logger
 from app.core.string_normalizers import string_list, string_or_empty, string_or_none
+from app.core.text import clean_document_text, truncate_document_text
 from app.modules.github.config import GitHubParserConfig
 from app.modules.github.model import (
     GitHubRepoReadme,
@@ -15,27 +15,19 @@ from app.modules.github.model import (
     ParsedGitHubProject,
     github_project_parser,
 )
-from app.modules.github.prompt import GITHUB_SYSTEM_PROMPT, build_github_user_prompt
+from app.modules.github.prompt_builder import build_github_user_prompt
+from prompts.github.parse import GITHUB_SYSTEM_PROMPT
 from app.modules.llm.interface import LLMMessage, LLMRequest
 
 logger = get_logger(__name__)
 
 
 def clean_readme_text(raw_text: str) -> str:
-    text = raw_text.replace("\x00", " ")
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    return clean_document_text(raw_text)
 
 
 def truncate_readme_text(raw_text: str, max_chars: int) -> str:
-    cleaned_text = clean_readme_text(raw_text)
-
-    if len(cleaned_text) <= max_chars:
-        return cleaned_text
-
-    return cleaned_text[:max_chars].rstrip()
+    return truncate_document_text(raw_text, max_chars)
 
 
 def extract_github_username(github_url: str) -> str:

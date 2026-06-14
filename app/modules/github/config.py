@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.core.settings import get_settings
 from app.modules.github.validator import validate_github_parser_config
-from setting import GITHUB_TOKEN_ENV, get_env
 
 
 @dataclass(frozen=True)
@@ -17,9 +17,9 @@ class GitHubParserConfig:
 
     def __post_init__(self) -> None:
         if self.github_token is None:
-            token = get_env(GITHUB_TOKEN_ENV)
-            if isinstance(token, str) and token.strip():
-                object.__setattr__(self, "github_token", token.strip())
+            token = get_settings().github_token.strip()
+            if token:
+                object.__setattr__(self, "github_token", token)
 
     def validate(self) -> None:
         validate_github_parser_config(self)

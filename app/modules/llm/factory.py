@@ -1,46 +1,42 @@
 from __future__ import annotations
 
 from app.core.logger import get_logger
+from app.core.settings import get_settings
 from app.modules.llm.providers.gemini import GeminiProvider
 from app.modules.llm.providers.groq import GroqProvider
 from app.modules.llm.providers.openai import OpenAIProvider
 from app.modules.llm.router import LLMRouter
-from setting import GROQ_KEY_ENV_VARS, get_env
 
 logger = get_logger(__name__)
 
 
 def build_default_llm_router() -> LLMRouter:
-    groq_model = get_env("GROQ_MODEL", GroqProvider.default_model)
-    openai_key = get_env("OPENAI_API_KEY")
-    gemini_key = get_env("GEMINI_API_KEY")
+    settings = get_settings()
+    groq_model = settings.groq_model or GroqProvider.default_model
 
     providers = []
-    for index, env_var in enumerate(GROQ_KEY_ENV_VARS, start=1):
-        api_key = get_env(env_var)
-        if api_key:
-            providers.append(
-                GroqProvider(
-                    name=f"groq-{index}",
-                    api_key=api_key,
-                    default_model=groq_model,
-                )
-            )
-
-    # OpenAI: single key fallback
-    if openai_key:
+    for index, api_key in enumerate(settings.groq_api_keys(), start=1):
         providers.append(
-            OpenAIProvider(
-                api_key=openai_key,
-                default_model=get_env("OPENAI_MODEL", OpenAIProvider.default_model),
+            GroqProvider(
+                name=f"groq-{index}",
+                api_key=api_key,
+                default_model=groq_model,
             )
         )
 
-    if gemini_key:
+    if settings.openai_api_key:
+        providers.append(
+            OpenAIProvider(
+                api_key=settings.openai_api_key,
+                default_model=settings.openai_model or OpenAIProvider.default_model,
+            )
+        )
+
+    if settings.gemini_api_key:
         providers.append(
             GeminiProvider(
-                api_key=gemini_key,
-                default_model=get_env("GEMINI_MODEL", GeminiProvider.default_model),
+                api_key=settings.gemini_api_key,
+                default_model=settings.gemini_model or GeminiProvider.default_model,
             )
         )
 
@@ -48,8 +44,8 @@ def build_default_llm_router() -> LLMRouter:
         logger.error("No LLM API keys configured")
         raise RuntimeError(
             "No LLM API keys found. Set at least one of: "
-            + ", ".join(GROQ_KEY_ENV_VARS)
-            + ", OPENAI_API_KEY, GEMINI_API_KEY"
+            "GROQ_API_KEY_1, GROQ_API_KEY_2, GROQ_API_KEY_3, GROQ_API_KEY_4, "
+            "OPENAI_API_KEY, GEMINI_API_KEY"
         )
 
     provider_names = [provider.name for provider in providers]

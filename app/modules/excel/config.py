@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Mapping
 
 from app.modules.excel.validator import validate_excel_parser_config
-from setting import EXCEL_COLUMN_ALIASES
+from app.core.constants import EXCEL_COLUMN_ALIASES
 
 
 @dataclass(frozen=True)

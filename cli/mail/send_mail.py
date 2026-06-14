@@ -3,19 +3,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 from typing import Sequence
 
-import dotenv
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-from app.core.exceptions import AppError  # noqa: E402
-from app.modules.mail.factory import build_default_mail_sender  # noqa: E402
-from app.modules.mail.model import MailAttachment, MailMessage  # noqa: E402
+from cli.bootstrap import bootstrap_cli
+from app.core.exceptions import AppError
+from app.modules.mail.factory import build_default_mail_sender
+from app.modules.mail.model import MailAttachment, MailMessage
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -107,7 +101,7 @@ def write_json_output(payload: dict[str, object], output_file: Path | None, comp
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    dotenv.load_dotenv()
+    bootstrap_cli()
 
     parser = build_arg_parser()
     args = parser.parse_args(argv)

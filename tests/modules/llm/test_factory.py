@@ -2,14 +2,32 @@ from __future__ import annotations
 
 import pytest
 
+from app.core.settings import reset_settings
 from app.modules.llm.factory import build_default_llm_router
+
+LLM_ENV_VARS = (
+    "GROQ_API_KEY_1",
+    "GROQ_API_KEY_2",
+    "GROQ_API_KEY_3",
+    "GROQ_API_KEY_4",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+)
+
+
+def _clear_llm_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for var in LLM_ENV_VARS:
+        monkeypatch.setenv(var, "")
+    reset_settings()
 
 
 def test_factory_creates_all_providers(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
     monkeypatch.setenv("GROQ_API_KEY_1", "groq-key-1")
     monkeypatch.setenv("GROQ_API_KEY_2", "groq-key-2")
     monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    reset_settings()
 
     router = build_default_llm_router()
 
@@ -18,8 +36,10 @@ def test_factory_creates_all_providers(monkeypatch) -> None:
 
 
 def test_factory_four_groq_keys(monkeypatch) -> None:
-    for i in range(1, 5):
-        monkeypatch.setenv(f"GROQ_API_KEY_{i}", f"key-{i}")
+    _clear_llm_env(monkeypatch)
+    for index in range(1, 5):
+        monkeypatch.setenv(f"GROQ_API_KEY_{index}", f"key-{index}")
+    reset_settings()
 
     router = build_default_llm_router()
 
@@ -30,7 +50,9 @@ def test_factory_four_groq_keys(monkeypatch) -> None:
 
 
 def test_factory_only_gemini_key(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    reset_settings()
 
     router = build_default_llm_router()
 
@@ -40,7 +62,9 @@ def test_factory_only_gemini_key(monkeypatch) -> None:
 
 
 def test_factory_only_openai_key(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
     monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+    reset_settings()
 
     router = build_default_llm_router()
 
@@ -49,8 +73,10 @@ def test_factory_only_openai_key(monkeypatch) -> None:
 
 
 def test_factory_respects_custom_models(monkeypatch) -> None:
+    _clear_llm_env(monkeypatch)
     monkeypatch.setenv("GROQ_API_KEY_1", "key")
     monkeypatch.setenv("GROQ_MODEL", "custom-groq-model")
+    reset_settings()
 
     router = build_default_llm_router()
 
@@ -58,10 +84,7 @@ def test_factory_respects_custom_models(monkeypatch) -> None:
 
 
 def test_factory_raises_when_no_keys(monkeypatch) -> None:
-    # Clear all possible keys
-    for var in ["GROQ_API_KEY_1", "GROQ_API_KEY_2", "GROQ_API_KEY_3",
-                "GROQ_API_KEY_4", "OPENAI_API_KEY", "GEMINI_API_KEY"]:
-        monkeypatch.delenv(var, raising=False)
+    _clear_llm_env(monkeypatch)
 
     with pytest.raises(RuntimeError, match="No LLM API keys found"):
         build_default_llm_router()

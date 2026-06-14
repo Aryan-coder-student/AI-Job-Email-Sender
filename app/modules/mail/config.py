@@ -4,20 +4,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core.exceptions import MailConfigurationError
+from app.core.settings import get_settings
 from app.modules.mail.presets import SMTP_PRESETS, SUPPORTED_MAIL_PROVIDERS
 from app.modules.mail.validator import validate_mail_config
-from setting import (
-    MAIL_PROVIDER_ENV,
-    SMTP_FROM_EMAIL_ENV,
-    SMTP_HOST_ENV,
-    SMTP_PASSWORD_ENV,
-    SMTP_PORT_ENV,
-    SMTP_TIMEOUT_SECONDS_ENV,
-    SMTP_USE_SSL_ENV,
-    SMTP_USE_TLS_ENV,
-    SMTP_USERNAME_ENV,
-    get_env,
-)
 
 DEFAULT_MAIL_PROVIDER = "gmail"
 DEFAULT_SMTP_TIMEOUT_SECONDS = 30
@@ -37,12 +26,12 @@ class MailConfig:
 
     @classmethod
     def from_env(cls) -> MailConfig:
-        provider = _normalize_provider(get_env(MAIL_PROVIDER_ENV, DEFAULT_MAIL_PROVIDER))
-        username = _required_env(SMTP_USERNAME_ENV)
-        password = _required_env(SMTP_PASSWORD_ENV)
-        from_email = _normalize_optional(get_env(SMTP_FROM_EMAIL_ENV)) or username
-
-        host, port, use_tls, use_ssl = _resolve_connection_settings(provider)
+        settings = get_settings()
+        provider = _normalize_provider(settings.mail_provider or DEFAULT_MAIL_PROVIDER)
+        username = _required_value(settings.smtp_username, field_name="SMTP_USERNAME")
+        password = _required_value(settings.smtp_password, field_name="SMTP_PASSWORD")
+        from_email = _normalize_optional(settings.smtp_from_email) or username
+        host, port, use_tls, use_ssl = _resolve_connection_settings(settings, provider)
 
         config = cls(
             provider=provider,
@@ -53,7 +42,7 @@ class MailConfig:
             from_email=from_email,
             use_tls=use_tls,
             use_ssl=use_ssl,
-            timeout_seconds=_parse_timeout(get_env(SMTP_TIMEOUT_SECONDS_ENV, str(DEFAULT_SMTP_TIMEOUT_SECONDS))),
+            timeout_seconds=settings.smtp_timeout_seconds or DEFAULT_SMTP_TIMEOUT_SECONDS,
         )
         config.validate()
         return config
@@ -62,22 +51,21 @@ class MailConfig:
         validate_mail_config(self)
 
 
-def _resolve_connection_settings(provider: str) -> tuple[str, int, bool, bool]:
+def _resolve_connection_settings(settings: Any, provider: str) -> tuple[str, int, bool, bool]:
     if provider == "custom":
         return (
-            _required_env(SMTP_HOST_ENV),
-            _parse_port(get_env(SMTP_PORT_ENV)),
-            _parse_bool(get_env(SMTP_USE_TLS_ENV, "true")),
-            _parse_bool(get_env(SMTP_USE_SSL_ENV, "false")),
+            _required_value(settings.smtp_host, field_name="SMTP_HOST"),
+            _parse_port(settings.smtp_port),
+            settings.smtp_use_tls,
+            settings.smtp_use_ssl,
         )
 
     preset = SMTP_PRESETS[provider]
-    return (
-        _normalize_optional(get_env(SMTP_HOST_ENV)) or preset.host,
-        _parse_port(get_env(SMTP_PORT_ENV, str(preset.port))),
-        _parse_bool(get_env(SMTP_USE_TLS_ENV, str(preset.use_tls).lower())),
-        _parse_bool(get_env(SMTP_USE_SSL_ENV, str(preset.use_ssl).lower())),
-    )
+    host = _normalize_optional(settings.smtp_host) or preset.host
+    port = _parse_port(settings.smtp_port or preset.port)
+    use_tls = settings.smtp_use_tls if settings.smtp_host else preset.use_tls
+    use_ssl = settings.smtp_use_ssl if settings.smtp_host else preset.use_ssl
+    return host, port, use_tls, use_ssl
 
 
 def _normalize_provider(value: Any) -> str:
@@ -92,11 +80,11 @@ def _normalize_provider(value: Any) -> str:
     return provider
 
 
-def _required_env(name: str) -> str:
-    value = _normalize_optional(get_env(name))
-    if not value:
-        raise MailConfigurationError(f"{name} is required.")
-    return value
+def _required_value(value: Any, *, field_name: str) -> str:
+    normalized = _normalize_optional(value)
+    if not normalized:
+        raise MailConfigurationError(f"{field_name} is required.")
+    return normalized
 
 
 def _normalize_optional(value: Any) -> str | None:
@@ -118,31 +106,3 @@ def _parse_port(value: Any) -> int:
         raise MailConfigurationError("SMTP_PORT must be between 1 and 65535.")
 
     return port
-
-
-def _parse_timeout(value: Any) -> int:
-    try:
-        timeout = int(value)
-    except (TypeError, ValueError) as error:
-        raise MailConfigurationError("SMTP_TIMEOUT_SECONDS must be a valid integer.") from error
-
-    if timeout < 1:
-        raise MailConfigurationError("SMTP_TIMEOUT_SECONDS must be at least 1.")
-
-    return timeout
-
-
-def _parse_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-
-    if not isinstance(value, str):
-        raise MailConfigurationError("Boolean SMTP settings must be true or false.")
-
-    normalized = value.strip().lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-
-    raise MailConfigurationError("Boolean SMTP settings must be true or false.")

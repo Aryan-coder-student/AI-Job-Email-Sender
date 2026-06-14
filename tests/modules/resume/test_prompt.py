@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from app.modules.resume.prompt import (
-    RESUME_SYSTEM_PROMPT,
-    RESUME_USER_PROMPT_RULES,
-    build_resume_user_prompt,
-)
+from app.modules.resume.prompt_builder import build_resume_user_prompt
+from prompts.resume.parse import RESUME_SYSTEM_PROMPT, RESUME_USER_PROMPT_RULES
 
 
 def test_resume_system_prompt_is_non_empty() -> None:

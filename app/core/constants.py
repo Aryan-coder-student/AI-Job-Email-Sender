@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import os
-from typing import Any
-
-
 EXCEL_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "company_name": (
         "company",
@@ -99,8 +95,16 @@ EXCEL_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
         "job title",
         "job_title",
     ),
+    "job_description": (
+        "job description",
+        "job_description",
+        "role description",
+        "position description",
+        "requirements",
+        "job requirements",
+        "jd",
+    ),
 }
-
 
 RESUME_ALLOWED_EXTENSIONS = (".txt", ".pdf", ".docx")
 
@@ -144,40 +148,9 @@ RESUME_SECTION_ALIASES: dict[str, tuple[str, ...]] = {
     ),
 }
 
-RESUME_STRUCTURE_FIELDS = (
-    "candidate_name",
-    "summary",
-    "skills",
-    "experience",
-    "projects",
-    "achievements",
-    "research",
-    "education",
-    "links",
+GROQ_API_KEY_FIELDS = (
+    "groq_api_key_1",
+    "groq_api_key_2",
+    "groq_api_key_3",
+    "groq_api_key_4",
 )
-
-GROQ_KEY_ENV_VARS = (
-    "GROQ_API_KEY_1",
-    "GROQ_API_KEY_2",
-    "GROQ_API_KEY_3",
-    "GROQ_API_KEY_4",
-)
-
-GITHUB_TOKEN_ENV = "GITHUB_TOKEN"
-
-LOG_LEVEL_ENV = "LOG_LEVEL"
-LOG_FILE_ENV = "LOG_FILE"
-
-MAIL_PROVIDER_ENV = "MAIL_PROVIDER"
-SMTP_HOST_ENV = "SMTP_HOST"
-SMTP_PORT_ENV = "SMTP_PORT"
-SMTP_USERNAME_ENV = "SMTP_USERNAME"
-SMTP_PASSWORD_ENV = "SMTP_PASSWORD"
-SMTP_FROM_EMAIL_ENV = "SMTP_FROM_EMAIL"
-SMTP_USE_TLS_ENV = "SMTP_USE_TLS"
-SMTP_USE_SSL_ENV = "SMTP_USE_SSL"
-SMTP_TIMEOUT_SECONDS_ENV = "SMTP_TIMEOUT_SECONDS"
-
-
-def get_env(name: str, default: Any = None) -> Any:
-    return os.getenv(name, default)
