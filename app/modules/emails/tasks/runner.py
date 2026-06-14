@@ -17,14 +17,17 @@ def _resolve_company_record(
     company_name: str,
     company_record: dict[str, Any] | None,
     companies_path: str | Path | None,
+    company_records: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if company_record is not None:
         return company_record
 
-    if companies_path is None:
-        raise EmailDraftError("company_record or companies_path is required.")
-
-    records = load_json_file(str(companies_path))
+    if company_records is not None:
+        records = company_records
+    elif companies_path is not None:
+        records = load_json_file(str(companies_path))
+    else:
+        raise EmailDraftError("company_record, company_records, or companies_path is required.")
     matches = [
         record
         for record in records
@@ -65,26 +68,36 @@ def _load_github_projects(github_path: str | Path | None) -> list[dict[str, Any]
 
 def run_generate_draft(
     *,
-    resume: str | Path,
+    resume: str | Path | None = None,
+    parsed_resume_data: dict[str, Any] | None = None,
     company_name: str,
     matches: list[dict[str, Any]] | None = None,
     matches_path: str | Path | None = None,
     company_record: dict[str, Any] | None = None,
     companies_path: str | Path | None = None,
+    company_records: list[dict[str, Any]] | None = None,
     github_path: str | Path | None = None,
+    github_projects: list[dict[str, Any]] | None = None,
     recipient_email: str | None = None,
     enqueue: bool = True,
     queue: EmailDraftQueue | None = None,
 ) -> dict[str, Any]:
-    parsed_resume = parsed_resume_from_dict(load_json_file(str(resume)))
+    if parsed_resume_data is not None:
+        parsed_resume = parsed_resume_from_dict(parsed_resume_data)
+    elif resume is not None:
+        parsed_resume = parsed_resume_from_dict(load_json_file(str(resume)))
+    else:
+        raise EmailDraftError("resume path or parsed_resume_data is required.")
+
     resolved_matches = _resolve_matches(matches=matches, matches_path=matches_path)
     resolved_company = _resolve_company_record(
         company_name=company_name,
         company_record=company_record,
         companies_path=companies_path,
+        company_records=company_records,
     )
     top_match = resolved_matches[0] if resolved_matches else {}
-    github_projects = _load_github_projects(github_path)
+    active_github_projects = github_projects if github_projects is not None else _load_github_projects(github_path)
 
     request = DraftGenerationRequest(
         candidate_name=parsed_resume.candidate_name,
@@ -94,7 +107,7 @@ def run_generate_draft(
         company_record=resolved_company,
         top_match=top_match,
         recipient_email=recipient_email,
-        github_projects=github_projects,
+        github_projects=active_github_projects,
     )
 
     llm_router = build_default_draft_service()

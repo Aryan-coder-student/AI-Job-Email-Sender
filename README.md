@@ -82,6 +82,47 @@ Useful flags:
 | `--dry-run` | Mail step does not send (no SMTP required) |
 | `--no-enqueue` | Write draft JSON only; skip Redis queue |
 
+### Programmatic pipeline
+
+The [`pipeline/`](pipeline/) package orchestrates the same flow in Python using the **Builder** and **Strategy** patterns:
+
+```python
+from pathlib import Path
+
+from pipeline import ApplicationPipelineBuilder, PipelineOptions, PipelineStep
+
+pipeline = (
+    ApplicationPipelineBuilder(project_root=Path("."))
+    .with_resume("data/AryanPahari.pdf")
+    .with_companies("data/companies_sheet.json")
+    .with_target_company("10up")
+    .with_options(PipelineOptions(dry_run=True, from_step=1))
+    .build()
+)
+
+result = pipeline.run()
+print(result.context.draft)
+```
+
+Run a custom subset of steps:
+
+```python
+result = pipeline.run(
+    steps=(
+        PipelineStep.PARSE_RESUME,
+        PipelineStep.PARSE_GITHUB,
+        PipelineStep.BUILD_GRAPH,
+    )
+)
+```
+
+CLI entrypoint (also used by `scripts/run_pipeline.sh`):
+
+```bash
+.venv/bin/python -m pipeline.cli --from-step 5 --dry-run
+.venv/bin/python -m pipeline.cli --steps parse_resume parse_github build_graph
+```
+
 ### Pipeline steps
 
 1. **Parse resume** → `data/parse_resume.json`
@@ -203,12 +244,13 @@ Module suites:
 .venv/bin/python -m pytest tests/modules/emails
 .venv/bin/python -m pytest tests/core
 .venv/bin/python -m pytest tests/celery
-.venv/bin/python -m pytest tests/redis
+.venv/bin/python -m pytest tests/pipeline
 ```
 
 ## Project layout
 
 ```
+pipeline/         ApplicationPipelineBuilder + step handlers
 app/
   core/           settings, logging, exceptions, constants
   modules/        excel, resume, github, graph, vector, matching, emails, mail, llm

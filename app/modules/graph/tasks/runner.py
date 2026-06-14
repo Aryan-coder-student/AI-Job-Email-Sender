@@ -26,9 +26,12 @@ from app.modules.vector.indexer import index_job_openings, index_projects
 
 def run_build_knowledge_graph(
     *,
-    resume: str | Path,
-    github: str | Path,
-    companies: str | Path,
+    resume: str | Path | None = None,
+    github: str | Path | None = None,
+    companies: str | Path | None = None,
+    parsed_resume_data: dict[str, Any] | None = None,
+    parsed_github_data: dict[str, Any] | None = None,
+    company_records: list[dict[str, Any]] | None = None,
     candidate_id: str | None = None,
     max_companies: int = 25,
     max_github_enrichment: int = 10,
@@ -44,9 +47,26 @@ def run_build_knowledge_graph(
         if clear:
             graph_store.clear()
 
-        parsed_resume = parsed_resume_from_dict(load_json_file(str(resume)))
-        parsed_github = parsed_github_from_dict(load_json_file(str(github)))
-        company_records = load_json_file(str(companies))
+        if parsed_resume_data is not None:
+            parsed_resume = parsed_resume_from_dict(parsed_resume_data)
+        elif resume is not None:
+            parsed_resume = parsed_resume_from_dict(load_json_file(str(resume)))
+        else:
+            raise ValueError("resume path or parsed_resume_data is required.")
+
+        if parsed_github_data is not None:
+            parsed_github = parsed_github_from_dict(parsed_github_data)
+        elif github is not None:
+            parsed_github = parsed_github_from_dict(load_json_file(str(github)))
+        else:
+            raise ValueError("github path or parsed_github_data is required.")
+
+        if company_records is not None:
+            active_company_records = company_records
+        elif companies is not None:
+            active_company_records = load_json_file(str(companies))
+        else:
+            raise ValueError("companies path or company_records is required.")
 
         llm_router = None
         github_enrichments = None
@@ -73,7 +93,7 @@ def run_build_knowledge_graph(
             candidate_id=candidate_id,
         )
         company_result = build_company_graph(
-            company_records=company_records,
+            company_records=active_company_records,
             graph_store=graph_store,
             llm_router=llm_router,
             max_records=max_companies,
@@ -85,7 +105,7 @@ def run_build_knowledge_graph(
             collection=vector_config.projects_collection,
         )
         jobs_indexed = index_job_openings(
-            company_records[:max_companies],
+            active_company_records[:max_companies],
             vector_store=vector_store,
             embedding_provider=embedding_provider,
             collection=vector_config.jobs_collection,
