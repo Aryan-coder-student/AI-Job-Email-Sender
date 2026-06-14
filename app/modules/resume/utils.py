@@ -4,92 +4,21 @@ import json
 import re
 from typing import Any
 
-from pydantic import BaseModel, Field
-from langchain_core.output_parsers import PydanticOutputParser
-
 from app.core.exceptions import InvalidResumeError
+from app.core.string_normalizers import string_list, string_or_empty, string_or_none
 from app.modules.llm.interface import LLMMessage, LLMRequest
 from app.modules.resume.config import ResumeParserConfig
-from app.modules.resume.schema import (
+from app.modules.resume.model import (
     ParsedResume,
-    ResumeLinks,
-    ResumeExperience,
-    ResumeProject,
-    ResumeCourse,
     ResumeCertification,
+    ResumeCourse,
+    ResumeExperience,
+    ResumeLinks,
+    ResumeProject,
+    resume_parser,
 )
+from app.modules.resume.prompt import RESUME_SYSTEM_PROMPT, build_resume_user_prompt
 from setting import RESUME_SECTION_ALIASES
-
-
-class ResumeLinksSchema(BaseModel):
-    emails: list[str] = Field(default_factory=list)
-    phones: list[str] = Field(default_factory=list)
-    github: str | None = None
-    linkedin: str | None = None
-    portfolio: str | None = None
-    urls: list[str] = Field(default_factory=list)
-
-
-class ExperienceSchema(BaseModel):
-    company_name: str | None = Field(default=None, description="Company or organization name.")
-    date: str | None = Field(default=None, description="Range of dates, e.g. '1/2022 - 4/2022'.")
-    description: str | None = Field(default=None, description="Full bullet point descriptions of responsibilities.")
-
-class ProjectSchema(BaseModel):
-    project_name: str | None = Field(default=None, description="Project name.")
-    link: str | None = Field(default=None, description="Link or URL to the project if available.")
-    description: str | None = Field(default=None, description="Full description of the project.")
-
-class CourseSchema(BaseModel):
-    name: str | None = Field(default=None, description="Name of the course.")
-    description: str | None = Field(default=None, description="Description of the course if available.")
-
-class CertificationSchema(BaseModel):
-    name: str | None = Field(default=None, description="Name of the certification.")
-    link: str | None = Field(default=None, description="Link or URL to the certificate if available.")
-
-class ResumeStructureSchema(BaseModel):
-    candidate_name: str | None = Field(
-        default=None, description="Candidate name exactly as shown in the resume."
-    )
-    summary: str = Field(
-        default="", description="Concise factual summary, max 3 sentences."
-    )
-    skills: list[str] = Field(
-        default_factory=list, description="List of individual skills."
-    )
-    experience: list[ExperienceSchema] = Field(
-        default_factory=list, 
-        description="List of work experiences."
-    )
-    projects: list[ProjectSchema] = Field(
-        default_factory=list, 
-        description="List of projects."
-    )
-    courses: list[CourseSchema] = Field(
-        default_factory=list, 
-        description="List of courses."
-    )
-    certifications: list[CertificationSchema] = Field(
-        default_factory=list, 
-        description="List of certifications."
-    )
-    achievements: list[str] = Field(
-        default_factory=list, 
-        description="List of achievements, awards, and recognitions including full details."
-    )
-    research: list[str] = Field(
-        default_factory=list, 
-        description="List of research work, papers, or publications with descriptions."
-    )
-    education: list[str] = Field(
-        default_factory=list, 
-        description="List of educational qualifications including degree, institution, and dates."
-    )
-    links: ResumeLinksSchema = Field(default_factory=ResumeLinksSchema)
-
-
-resume_parser = PydanticOutputParser(pydantic_object=ResumeStructureSchema)
 
 
 def clean_resume_text(raw_text: str) -> str:
@@ -119,30 +48,15 @@ def build_resume_structure_request(
 ) -> LLMRequest:
     resume_text = cleaned_text[: config.max_cleaned_text_chars]
     section_aliases_json = json.dumps(RESUME_SECTION_ALIASES, indent=2)
-
-    system_prompt = (
-        "You are a resume parsing agent. Extract only facts explicitly present "
-        "in the resume. Do not infer, embellish, or invent missing data."
+    user_prompt = build_resume_user_prompt(
+        resume_text=resume_text,
+        section_aliases_json=section_aliases_json,
+        format_instructions=resume_parser.get_format_instructions(),
     )
-    user_prompt = f"""
-Extract structured resume data based on the provided text.
-
-Rules:
-- Achievements include awards, measurable wins, honors, recognitions, competitions.
-- Research includes papers, publications, patents, thesis, ML/AI research work.
-- Preserve URLs exactly when possible.
-- Section aliases that may appear:
-{section_aliases_json}
-
-{resume_parser.get_format_instructions()}
-
-Resume text:
-{resume_text}
-""".strip()
 
     return LLMRequest(
         messages=[
-            LLMMessage(role="system", content=system_prompt),
+            LLMMessage(role="system", content=RESUME_SYSTEM_PROMPT),
             LLMMessage(role="user", content=user_prompt),
         ],
         temperature=0,
@@ -170,51 +84,51 @@ def build_parsed_resume_from_structure(
     metadata: dict[str, Any] | None = None,
 ) -> ParsedResume:
     links = _normalise_links(structure.get("links"))
-    
+
     experiences = []
     for exp in structure.get("experience", []):
         experiences.append(ResumeExperience(
-            company_name=_string_or_none(exp.get("company_name")),
-            date=_string_or_none(exp.get("date")),
-            description=_string_or_none(exp.get("description")),
+            company_name=string_or_none(exp.get("company_name")),
+            date=string_or_none(exp.get("date")),
+            description=string_or_none(exp.get("description")),
         ))
 
     projects = []
     for proj in structure.get("projects", []):
         projects.append(ResumeProject(
-            project_name=_string_or_none(proj.get("project_name")),
-            link=_string_or_none(proj.get("link")),
-            description=_string_or_none(proj.get("description")),
+            project_name=string_or_none(proj.get("project_name")),
+            link=string_or_none(proj.get("link")),
+            description=string_or_none(proj.get("description")),
         ))
 
     courses = []
     for course in structure.get("courses", []):
         courses.append(ResumeCourse(
-            name=_string_or_none(course.get("name")),
-            description=_string_or_none(course.get("description")),
+            name=string_or_none(course.get("name")),
+            description=string_or_none(course.get("description")),
         ))
 
     certifications = []
     for cert in structure.get("certifications", []):
         certifications.append(ResumeCertification(
-            name=_string_or_none(cert.get("name")),
-            link=_string_or_none(cert.get("link")),
+            name=string_or_none(cert.get("name")),
+            link=string_or_none(cert.get("link")),
         ))
 
     return ParsedResume(
         filename=filename,
         file_extension=file_extension,
         raw_text=raw_text,
-        candidate_name=_string_or_none(structure.get("candidate_name")),
-        summary=_string_or_empty(structure.get("summary")),
-        skills=_string_list(structure.get("skills")),
+        candidate_name=string_or_none(structure.get("candidate_name")),
+        summary=string_or_empty(structure.get("summary")),
+        skills=string_list(structure.get("skills")),
         experience=experiences,
         projects=projects,
         courses=courses,
         certifications=certifications,
-        achievements=_string_list(structure.get("achievements")),
-        research=_string_list(structure.get("research")),
-        education=_string_list(structure.get("education")),
+        achievements=string_list(structure.get("achievements")),
+        research=string_list(structure.get("research")),
+        education=string_list(structure.get("education")),
         links=links,
         metadata=metadata or {},
     )
@@ -248,50 +162,15 @@ def build_text_only_resume(
     )
 
 
-def _extract_json_object(content: str) -> str:
-    stripped_content = content.strip()
-    fenced_match = re.search(
-        r"```(?:json)?\s*(\{.*?\})\s*```",
-        stripped_content,
-        flags=re.DOTALL,
-    )
-
-    if fenced_match:
-        return fenced_match.group(1)
-
-    return stripped_content
-
-
 def _normalise_links(value: Any) -> ResumeLinks:
     if not isinstance(value, dict):
         return ResumeLinks()
 
     return ResumeLinks(
-        emails=_string_list(value.get("emails")),
-        phones=_string_list(value.get("phones")),
-        github=_string_or_none(value.get("github")),
-        linkedin=_string_or_none(value.get("linkedin")),
-        portfolio=_string_or_none(value.get("portfolio")),
-        urls=_string_list(value.get("urls")),
+        emails=string_list(value.get("emails")),
+        phones=string_list(value.get("phones")),
+        github=string_or_none(value.get("github")),
+        linkedin=string_or_none(value.get("linkedin")),
+        portfolio=string_or_none(value.get("portfolio")),
+        urls=string_list(value.get("urls")),
     )
-
-
-def _string_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-
-    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
-
-
-def _string_or_none(value: Any) -> str | None:
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-
-    return None
-
-
-def _string_or_empty(value: Any) -> str:
-    if isinstance(value, str):
-        return value.strip()
-
-    return ""

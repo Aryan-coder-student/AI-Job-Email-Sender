@@ -241,3 +241,4 @@ parsed.json
 parse_resume.json
 .streamlit/secrets.toml
 sample
+data/

@@ -10,6 +10,10 @@ class InvalidResumeError(AppError):
     """Raised when a resume file cannot be validated, opened, or parsed."""
 
 
+class InvalidGitHubError(AppError):
+    """Raised when GitHub URL/username is invalid or API fetch fails."""
+
+
 class LLMError(AppError):
     """Base error for LLM provider and router failures."""
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.modules.llm.router import LLMRouter
 from app.modules.resume.config import ResumeParserConfig
-from app.modules.resume.schema import ParsedResume
+from app.modules.resume.model import ParsedResume
 from app.modules.resume.utils import (
     build_parsed_resume_from_structure,
     build_resume_structure_request,

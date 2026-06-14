@@ -156,13 +156,14 @@ RESUME_STRUCTURE_FIELDS = (
     "links",
 )
 
-
 GROQ_KEY_ENV_VARS = (
     "GROQ_API_KEY_1",
     "GROQ_API_KEY_2",
     "GROQ_API_KEY_3",
     "GROQ_API_KEY_4",
 )
+
+GITHUB_TOKEN_ENV = "GITHUB_TOKEN"
 
 
 def get_env(name: str, default: Any = None) -> Any:

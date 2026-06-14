@@ -10,7 +10,7 @@ from pypdf import PdfReader
 from app.core.exceptions import InvalidResumeError
 from app.modules.resume.agent import extract_resume_structure_with_llm
 from app.modules.resume.config import ResumeParserConfig
-from app.modules.resume.schema import ParsedResume
+from app.modules.resume.model import ParsedResume
 from app.modules.resume.utils import build_text_only_resume, truncate_resume_text
 from app.modules.resume.validator import (
     validate_resume_content,
