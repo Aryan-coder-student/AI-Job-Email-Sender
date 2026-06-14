@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from app.core.logger import get_logger
 from app.modules.llm.providers.gemini import GeminiProvider
 from app.modules.llm.providers.groq import GroqProvider
 from app.modules.llm.providers.openai import OpenAIProvider
 from app.modules.llm.router import LLMRouter
 from setting import GROQ_KEY_ENV_VARS, get_env
+
+logger = get_logger(__name__)
 
 
 def build_default_llm_router() -> LLMRouter:
@@ -42,10 +45,13 @@ def build_default_llm_router() -> LLMRouter:
         )
 
     if not providers:
+        logger.error("No LLM API keys configured")
         raise RuntimeError(
             "No LLM API keys found. Set at least one of: "
             + ", ".join(GROQ_KEY_ENV_VARS)
             + ", OPENAI_API_KEY, GEMINI_API_KEY"
         )
 
+    provider_names = [provider.name for provider in providers]
+    logger.info("Initialized LLM router providers=%s", provider_names)
     return LLMRouter(providers=providers)

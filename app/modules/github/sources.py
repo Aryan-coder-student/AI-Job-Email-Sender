@@ -4,9 +4,12 @@ from github import Github
 from github.GithubException import GithubException, UnknownObjectException
 
 from app.core.exceptions import InvalidGitHubError
+from app.core.logger import get_logger
 from app.modules.github.config import GitHubParserConfig
 from app.modules.github.model import GitHubRepoReadme
 from app.modules.github.utils import clean_readme_text
+
+logger = get_logger(__name__)
 
 
 def fetch_user_repos_with_readmes(
@@ -15,6 +18,7 @@ def fetch_user_repos_with_readmes(
 ) -> tuple[list[GitHubRepoReadme], list[dict[str, str]]]:
     client = Github(login_or_token=config.github_token)
     user = _get_github_user(client, username)
+    logger.info("Fetching GitHub repositories for user=%s max_repos=%s", username, config.max_repos)
 
     repos_with_readmes: list[GitHubRepoReadme] = []
     skipped_repos: list[dict[str, str]] = []
@@ -33,10 +37,19 @@ def fetch_user_repos_with_readmes(
                 continue
 
             skipped_repos.append({"name": repo.name, "reason": repo_result})
+            logger.debug("Skipped GitHub repository name=%s reason=%s", repo.name, repo_result)
     except GithubException as error:
+        logger.exception("Failed to fetch GitHub repositories for user=%s", username)
         raise InvalidGitHubError(
             f"Failed to fetch repositories for {username}: {error}"
         ) from error
+
+    logger.info(
+        "Fetched GitHub repositories user=%s with_readme=%s skipped=%s",
+        username,
+        len(repos_with_readmes),
+        len(skipped_repos),
+    )
 
     return repos_with_readmes, skipped_repos
 
@@ -45,8 +58,10 @@ def _get_github_user(client: Github, username: str):
     try:
         return client.get_user(username)
     except UnknownObjectException as error:
+        logger.warning("GitHub user not found username=%s", username)
         raise InvalidGitHubError(f"GitHub user not found: {username}") from error
     except GithubException as error:
+        logger.exception("Failed to fetch GitHub user username=%s", username)
         raise InvalidGitHubError(f"Failed to fetch GitHub user {username}: {error}") from error
 
 

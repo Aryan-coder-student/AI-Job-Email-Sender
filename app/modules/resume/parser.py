@@ -8,6 +8,7 @@ from docx import Document
 from pypdf import PdfReader
 
 from app.core.exceptions import InvalidResumeError
+from app.core.logger import get_logger
 from app.modules.resume.agent import extract_resume_structure_with_llm
 from app.modules.resume.config import ResumeParserConfig
 from app.modules.resume.model import ParsedResume
@@ -20,6 +21,8 @@ from app.modules.resume.validator import (
 
 if TYPE_CHECKING:
     from app.modules.llm.router import LLMRouter
+
+logger = get_logger(__name__)
 
 
 def parse_resume_from_upload(
@@ -36,8 +39,16 @@ def parse_resume_from_upload(
     raw_text = _extract_text(file_content, extension)
     cleaned_text = truncate_resume_text(raw_text, active_config.max_cleaned_text_chars)
     validate_resume_text(cleaned_text)
+    logger.info(
+        "Parsing resume filename=%s extension=%s llm=%s text_chars=%s",
+        filename,
+        extension,
+        llm_router is not None,
+        len(cleaned_text),
+    )
 
     if llm_router is None:
+        logger.debug("Returning text-only resume for filename=%s", filename)
         return build_text_only_resume(
             filename=filename,
             file_extension=extension,
@@ -63,6 +74,7 @@ def parse_resume_from_path(
     try:
         file_content = file_path.read_bytes()
     except OSError as error:
+        logger.exception("Could not read resume file path=%s", file_path)
         raise InvalidResumeError(f"Could not read resume file: {error}") from error
 
     return parse_resume_from_upload(
@@ -130,6 +142,7 @@ def _parse_pdf_content(file_content: bytes) -> str:
             
         return full_text
     except Exception as error:
+        logger.exception("Could not parse PDF resume")
         raise InvalidResumeError(f"Could not parse PDF resume: {error}") from error
 
 
@@ -143,4 +156,5 @@ def _parse_docx_content(file_content: bytes) -> str:
         document = Document(BytesIO(file_content))
         return "\n".join(paragraph.text for paragraph in document.paragraphs)
     except Exception as error:
+        logger.exception("Could not parse DOCX resume")
         raise InvalidResumeError(f"Could not parse DOCX resume: {error}") from error

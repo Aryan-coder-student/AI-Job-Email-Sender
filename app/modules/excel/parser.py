@@ -5,6 +5,7 @@ from io import BytesIO
 from typing import Any, BinaryIO, TYPE_CHECKING
 
 from app.core.exceptions import InvalidExcelError
+from app.core.logger import get_logger
 from app.modules.excel.config import ExcelParserConfig
 from app.modules.excel.utils import (
     build_alias_lookup,
@@ -20,6 +21,8 @@ from app.modules.excel.validator import validate_excel_filename
 
 if TYPE_CHECKING:
     from openpyxl.worksheet.worksheet import Worksheet
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -112,6 +115,7 @@ def parse_excel_from_upload(
 ) -> ParsedExcelWorkbook:
     """Parse Excel bytes received from an upload endpoint."""
     validate_excel_filename(filename)
+    logger.info("Parsing uploaded Excel file filename=%s", filename)
     return _parse_workbook(BytesIO(file_content), filename=filename, config=config)
 
 
@@ -133,14 +137,21 @@ def _parse_workbook(
     try:
         workbook = load_workbook(file, read_only=True, data_only=True)
     except Exception as error:
+        logger.exception("Could not open Excel file filename=%s", filename)
         raise InvalidExcelError(f"Could not open Excel file: {error}") from error
 
     sheets = [
         _parse_sheet(sheet, active_config)
         for sheet in select_sheets(workbook.worksheets, active_config)
     ]
-
-    return ParsedExcelWorkbook(filename=filename, sheets=sheets)
+    workbook_result = ParsedExcelWorkbook(filename=filename, sheets=sheets)
+    logger.info(
+        "Parsed Excel workbook filename=%s sheets=%s rows=%s",
+        filename,
+        workbook_result.sheet_count,
+        workbook_result.total_rows,
+    )
+    return workbook_result
 
 
 def _parse_sheet(sheet: Worksheet, config: ExcelParserConfig) -> ParsedExcelSheet:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.logger import get_logger
 from app.modules.github.config import GitHubParserConfig
 from app.modules.github.model import ParsedGitHubProject
 from app.modules.github.utils import (
@@ -13,6 +14,8 @@ from app.modules.github.utils import (
 )
 from app.modules.llm.router import LLMRouter
 
+logger = get_logger(__name__)
+
 
 def extract_project_structure_with_llm(
     *,
@@ -20,6 +23,7 @@ def extract_project_structure_with_llm(
     llm_router: LLMRouter,
     config: GitHubParserConfig,
 ) -> tuple[ParsedGitHubProject, dict[str, Any]]:
+    logger.debug("Extracting GitHub project structure repo=%s", repo.repo_name)
     cleaned_readme = truncate_readme_text(repo.raw_readme, config.max_readme_chars)
     response = llm_router.generate(
         build_github_project_structure_request(
@@ -41,5 +45,11 @@ def extract_project_structure_with_llm(
         "llm_provider": response.provider,
         "llm_model": response.model,
     }
+    logger.debug(
+        "Extracted GitHub project structure repo=%s provider=%s model=%s",
+        repo.repo_name,
+        response.provider,
+        response.model,
+    )
 
     return project, metadata

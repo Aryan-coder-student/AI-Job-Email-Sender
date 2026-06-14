@@ -165,6 +165,9 @@ GROQ_KEY_ENV_VARS = (
 
 GITHUB_TOKEN_ENV = "GITHUB_TOKEN"
 
+LOG_LEVEL_ENV = "LOG_LEVEL"
+LOG_FILE_ENV = "LOG_FILE"
+
 
 def get_env(name: str, default: Any = None) -> Any:
     return os.getenv(name, default)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.core.logger import get_logger
 from app.modules.llm.router import LLMRouter
 from app.modules.resume.config import ResumeParserConfig
 from app.modules.resume.model import ParsedResume
@@ -10,6 +11,9 @@ from app.modules.resume.utils import (
 )
 
 
+logger = get_logger(__name__)
+
+
 def extract_resume_structure_with_llm(
     *,
     cleaned_text: str,
@@ -18,6 +22,7 @@ def extract_resume_structure_with_llm(
     llm_router: LLMRouter,
     config: ResumeParserConfig,
 ) -> ParsedResume:
+    logger.debug("Extracting resume structure with LLM filename=%s", filename)
     response = llm_router.generate(
         build_resume_structure_request(
             cleaned_text,
@@ -26,7 +31,7 @@ def extract_resume_structure_with_llm(
     )
     structure = parse_resume_structure_response(response.content)
 
-    return build_parsed_resume_from_structure(
+    parsed_resume = build_parsed_resume_from_structure(
         filename=filename,
         file_extension=file_extension,
         raw_text=cleaned_text,
@@ -37,3 +42,10 @@ def extract_resume_structure_with_llm(
             "llm_model": response.model,
         },
     )
+    logger.info(
+        "Extracted resume structure filename=%s provider=%s model=%s",
+        filename,
+        response.provider,
+        response.model,
+    )
+    return parsed_resume

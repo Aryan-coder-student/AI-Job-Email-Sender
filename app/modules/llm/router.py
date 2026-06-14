@@ -5,7 +5,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from app.core.exceptions import LLMError, LLMRateLimitError
+from app.core.logger import get_logger
 from app.modules.llm.interface import LLMProvider, LLMRequest, LLMResponse
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -41,28 +44,63 @@ class LLMRouter:
         last_error: Exception | None = None
 
         for provider in self.providers:
-            with self._state_lock:
-                state = self.provider_states[provider.name]
-                if state.is_paused():
-                    continue
+            if self._is_provider_paused(provider.name):
+                continue
 
             try:
-                return provider.generate(request)
+                return self._generate_with_provider(provider, request)
             except LLMRateLimitError as error:
                 last_error = error
-                with self._state_lock:
-                    self.pause_provider(provider.name, error.retry_after_seconds)
-                    self.provider_states[provider.name].last_error = str(error)
-                continue
+                self._handle_rate_limit(provider.name, error)
             except LLMError as error:
                 last_error = error
-                with self._state_lock:
-                    self.provider_states[provider.name].last_error = str(error)
-                continue
+                self._record_provider_error(provider.name, error)
 
+        self._raise_generate_failure(last_error)
+
+    def _is_provider_paused(self, provider_name: str) -> bool:
+        with self._state_lock:
+            is_paused = self.provider_states[provider_name].is_paused()
+
+        if is_paused:
+            logger.debug("Skipping paused LLM provider=%s", provider_name)
+
+        return is_paused
+
+    def _generate_with_provider(
+        self,
+        provider: LLMProvider,
+        request: LLMRequest,
+    ) -> LLMResponse:
+        response = provider.generate(request)
+        logger.debug(
+            "LLM request succeeded provider=%s model=%s",
+            response.provider,
+            response.model,
+        )
+        return response
+
+    def _handle_rate_limit(self, provider_name: str, error: LLMRateLimitError) -> None:
+        logger.warning(
+            "LLM provider rate limited provider=%s retry_after=%s",
+            provider_name,
+            error.retry_after_seconds,
+        )
+        with self._state_lock:
+            self.pause_provider(provider_name, error.retry_after_seconds)
+            self.provider_states[provider_name].last_error = str(error)
+
+    def _record_provider_error(self, provider_name: str, error: LLMError) -> None:
+        logger.warning("LLM provider failed provider=%s error=%s", provider_name, error)
+        with self._state_lock:
+            self.provider_states[provider_name].last_error = str(error)
+
+    def _raise_generate_failure(self, last_error: Exception | None) -> None:
         if last_error:
+            logger.error("All LLM providers failed last_error=%s", last_error)
             raise last_error
 
+        logger.error("No LLM providers are currently available")
         raise LLMError("No LLM providers are currently available.")
 
     def pause_provider(
