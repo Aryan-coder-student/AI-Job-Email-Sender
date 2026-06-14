@@ -7,9 +7,12 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 from app.core.exceptions import InvalidExcelError
+from app.core.logger import get_logger
 from app.modules.excel.config import ExcelParserConfig
 from app.modules.excel.parser import ParsedExcelWorkbook, parse_excel_from_upload
 from app.modules.excel.validator import validate_excel_url
+
+logger = get_logger(__name__)
 
 
 async def parse_excel_from_fastapi_upload(
@@ -31,8 +34,15 @@ def parse_excel_from_url(
     active_config.validate()
 
     download_url = _normalize_excel_download_url(url)
+    logger.info("Downloading Excel file url=%s", download_url)
     file_content = _download_excel(download_url, active_config)
     filename = _filename_from_url(url)
+    logger.info(
+        "Downloaded Excel file url=%s bytes=%s filename=%s",
+        download_url,
+        len(file_content),
+        filename,
+    )
     return parse_excel_from_upload(
         file_content=file_content,
         filename=filename,
@@ -46,10 +56,12 @@ def parse_excel_from_path(
 ) -> ParsedExcelWorkbook:
     """Read a local Excel file from disk and parse it."""
     file_path = Path(path)
+    logger.info("Parsing Excel file from path=%s", file_path)
 
     try:
         file_content = file_path.read_bytes()
     except OSError as error:
+        logger.exception("Could not read Excel file path=%s", file_path)
         raise InvalidExcelError(f"Could not read Excel file: {error}") from error
 
     return parse_excel_from_upload(
@@ -85,8 +97,10 @@ def _download_excel(url: str, config: ExcelParserConfig) -> bytes:
 
             return b"".join(chunks)
     except HTTPError as error:
+        logger.warning("Excel download failed url=%s status=%s", download_url, error.code)
         raise InvalidExcelError(f"Could not download Excel file: HTTP {error.code}") from error
     except URLError as error:
+        logger.warning("Excel download failed url=%s reason=%s", download_url, error.reason)
         raise InvalidExcelError(f"Could not download Excel file: {error.reason}") from error
 
 

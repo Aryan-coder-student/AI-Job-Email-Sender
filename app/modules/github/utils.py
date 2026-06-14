@@ -5,6 +5,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.core.exceptions import InvalidGitHubError
+from app.core.logger import get_logger
 from app.core.string_normalizers import string_list, string_or_empty, string_or_none
 from app.modules.github.config import GitHubParserConfig
 from app.modules.github.model import (
@@ -16,6 +17,8 @@ from app.modules.github.model import (
 )
 from app.modules.github.prompt import GITHUB_SYSTEM_PROMPT, build_github_user_prompt
 from app.modules.llm.interface import LLMMessage, LLMRequest
+
+logger = get_logger(__name__)
 
 
 def clean_readme_text(raw_text: str) -> str:
@@ -96,6 +99,7 @@ def parse_github_project_structure_response(content: str) -> dict[str, Any]:
         parsed_obj = github_project_parser.parse(content)
         return parsed_obj.model_dump()
     except Exception as error:
+        logger.warning("Invalid GitHub project JSON from LLM: %s", error)
         raise InvalidGitHubError(
             f"LLM returned invalid GitHub project JSON: {error}"
         ) from error

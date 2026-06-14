@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
 from app.core.exceptions import InvalidGitHubError
+from app.core.logger import get_logger
 from app.modules.github.agent import extract_project_structure_with_llm
 from app.modules.github.config import GitHubParserConfig
 from app.modules.github.model import GitHubRepoReadme, ParsedGitHubProfile, ParsedGitHubProject
@@ -19,6 +20,8 @@ from app.modules.resume.model import ParsedResume
 
 if TYPE_CHECKING:
     from app.modules.llm.router import LLMRouter
+
+logger = get_logger(__name__)
 
 
 def parse_github_from_resume(
@@ -45,6 +48,8 @@ def parse_github_profile(
     active_config.validate()
 
     username = extract_github_username(validate_github_url(github_url))
+    logger.info("Parsing GitHub profile for user=%s", username)
+
     repos_with_readmes, skipped_repos = fetch_user_repos_with_readmes(
         username,
         active_config,
@@ -57,9 +62,18 @@ def parse_github_profile(
     )
 
     if not projects and not skipped_repos:
+        logger.warning("No repositories found for GitHub user=%s", username)
         raise InvalidGitHubError(
             f"No repositories with readable READMEs were found for {username}."
         )
+
+    logger.info(
+        "Parsed GitHub profile user=%s projects=%s skipped=%s mode=%s",
+        username,
+        len(projects),
+        len(skipped_repos),
+        metadata.get("structured_by") or "readme_only",
+    )
 
     return build_parsed_github_profile(
         github_username=username,
@@ -77,6 +91,7 @@ def _build_projects_and_metadata(
     config: GitHubParserConfig,
 ) -> tuple[list[ParsedGitHubProject], dict[str, Any]]:
     if llm_router is None:
+        logger.debug("Skipping LLM extraction for %s README repositories", len(repos_with_readmes))
         projects = [build_readme_only_github_project(repo) for repo in repos_with_readmes]
         return projects, _build_fetch_metadata(
             repos_with_readmes,
@@ -106,6 +121,10 @@ def _extract_projects_with_llm(
     config: GitHubParserConfig,
 ) -> tuple[list[ParsedGitHubProject], list[dict[str, Any]]]:
     if len(repos_with_readmes) <= 1 or config.llm_max_workers == 1:
+        logger.debug(
+            "Extracting GitHub README structures sequentially for %s repositories",
+            len(repos_with_readmes),
+        )
         return _extract_projects_with_llm_sequential(
             repos_with_readmes,
             llm_router=llm_router,
@@ -113,6 +132,11 @@ def _extract_projects_with_llm(
         )
 
     indexed_results: list[tuple[int, ParsedGitHubProject, dict[str, Any]]] = []
+    logger.info(
+        "Extracting GitHub README structures in parallel repos=%s workers=%s",
+        len(repos_with_readmes),
+        config.llm_max_workers,
+    )
 
     with ThreadPoolExecutor(max_workers=config.llm_max_workers) as executor:
         futures = {

@@ -5,6 +5,7 @@ import re
 from typing import Any
 
 from app.core.exceptions import InvalidResumeError
+from app.core.logger import get_logger
 from app.core.string_normalizers import string_list, string_or_empty, string_or_none
 from app.modules.llm.interface import LLMMessage, LLMRequest
 from app.modules.resume.config import ResumeParserConfig
@@ -19,6 +20,8 @@ from app.modules.resume.model import (
 )
 from app.modules.resume.prompt import RESUME_SYSTEM_PROMPT, build_resume_user_prompt
 from setting import RESUME_SECTION_ALIASES
+
+logger = get_logger(__name__)
 
 
 def clean_resume_text(raw_text: str) -> str:
@@ -70,6 +73,7 @@ def parse_resume_structure_response(content: str) -> dict[str, Any]:
         parsed_obj = resume_parser.parse(content)
         return parsed_obj.model_dump()
     except Exception as error:
+        logger.warning("Invalid resume JSON from LLM: %s", error)
         raise InvalidResumeError(
             f"LLM returned invalid resume JSON: {error}"
         ) from error
