@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
-
 from pathlib import Path
 from typing import Mapping
 
 from app.modules.graph.serializers import load_json_file
-from pipeline.application import ApplicationPipeline, DEFAULT_STEP_HANDLERS
+from pipeline.application import DEFAULT_STEP_HANDLERS, ApplicationPipeline
 from pipeline.config import PipelineOptions
 from pipeline.context import PipelineContext
 from pipeline.exceptions import PipelineConfigurationError
@@ -27,8 +26,6 @@ class ApplicationPipelineBuilder:
 
     def with_companies(self, companies_path: str | Path) -> ApplicationPipelineBuilder:
         self._context.companies_path = Path(companies_path)
-        if self._context.companies_path.is_file():
-            self._context.companies = load_json_file(str(self._context.companies_path))
         return self
 
     def with_target_company(self, company_name: str) -> ApplicationPipelineBuilder:
@@ -65,12 +62,7 @@ class ApplicationPipelineBuilder:
         return self
 
     def build(self) -> ApplicationPipeline:
-        if self._context.companies_path and self._context.companies is None:
-            if not self._context.companies_path.is_file():
-                raise PipelineConfigurationError(
-                    f"Companies file not found: {self._context.companies_path}"
-                )
-            self._context.companies = load_json_file(str(self._context.companies_path))
+        self._load_companies_if_needed()
 
         return ApplicationPipeline(
             context=self._context,
@@ -78,3 +70,14 @@ class ApplicationPipelineBuilder:
             project_root=self._project_root,
             step_handlers=self._step_handlers or DEFAULT_STEP_HANDLERS,
         )
+
+    def _load_companies_if_needed(self) -> None:
+        if not self._context.companies_path or self._context.companies is not None:
+            return
+
+        if not self._context.companies_path.is_file():
+            raise PipelineConfigurationError(
+                f"Companies file not found: {self._context.companies_path}"
+            )
+
+        self._context.companies = load_json_file(str(self._context.companies_path))

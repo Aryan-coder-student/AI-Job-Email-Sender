@@ -18,7 +18,6 @@ from pipeline.steps.handlers import (
 )
 from pipeline.types import PipelineStep
 
-
 DEFAULT_STEP_HANDLERS: Mapping[PipelineStep, StepHandler] = {
     PipelineStep.PARSE_RESUME: ParseResumeStep(),
     PipelineStep.PARSE_GITHUB: ParseGitHubStep(),
@@ -96,14 +95,12 @@ class ApplicationPipeline:
             raise PipelineConfigurationError("resume_path is required when running PARSE_RESUME.")
 
         if self._context.companies_path is None and self._context.companies is None:
-            if any(
-                step in steps
-                for step in (
-                    PipelineStep.BUILD_GRAPH,
-                    PipelineStep.RANK_PROJECTS,
-                    PipelineStep.GENERATE_DRAFT,
-                )
-            ):
+            needs_companies = {
+                PipelineStep.BUILD_GRAPH,
+                PipelineStep.RANK_PROJECTS,
+                PipelineStep.GENERATE_DRAFT,
+            }
+            if any(step in steps for step in needs_companies):
                 raise PipelineConfigurationError("companies_path or companies data is required.")
 
         self._context.output_dir = self._options.output_dir

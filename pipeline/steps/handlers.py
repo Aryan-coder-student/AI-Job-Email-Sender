@@ -3,13 +3,14 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from app.modules.emails.tasks.runner import run_generate_draft
 from app.modules.github.config import GitHubParserConfig
 from app.modules.github.parser import parse_github_from_resume
+from app.modules.graph.serializers import load_json_file
 from app.modules.graph.tasks.runner import run_build_knowledge_graph
 from app.modules.llm.factory import build_default_llm_router
-from app.modules.matching.tasks.runner import run_rank_applications
-from app.modules.emails.tasks.runner import run_generate_draft
 from app.modules.mail.tasks.runner import run_process_email_queue
+from app.modules.matching.tasks.runner import run_rank_applications
 from app.modules.resume.config import ResumeParserConfig
 from app.modules.resume.parser import parse_resume_from_path
 from pipeline.config import PipelineOptions
@@ -68,8 +69,6 @@ class BuildGraphStep:
             raise PipelineConfigurationError("companies data is required.")
 
         if context.companies is None and context.companies_path is not None:
-            from app.modules.graph.serializers import load_json_file
-
             context.companies = load_json_file(str(context.companies_path))
 
         try:
