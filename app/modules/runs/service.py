@@ -163,6 +163,9 @@ class PipelineRunStore:
     def mark_step_running(self, run_id: str, key: str) -> None:
         self._update_step(run_id, key, status="running", error=None)
 
+    def mark_step_failed(self, run_id: str, key: str, error: str) -> None:
+        self._update_step(run_id, key, status="failed", error=error)
+
     def mark_step_completed(self, run_id: str, key: str) -> None:
         artifact_type = artifact_type_for_step(key)
         artifact_path = self._artifact_path(run_id, artifact_type)
@@ -320,6 +323,9 @@ class _RunPipelineObserver:
 
     def step_completed(self, step: PipelineStep) -> None:
         self._store.mark_step_completed(self._run_id, _step_key(step))
+
+    def step_failed(self, step: PipelineStep, error: str) -> None:
+        self._store.mark_step_failed(self._run_id, _step_key(step), error)
 
 
 _DRAFT_EDIT_FIELDS = {"to", "subject", "body_text", "body_html"}
