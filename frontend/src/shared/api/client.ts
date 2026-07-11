@@ -157,11 +157,11 @@ export const api = {
     if (useMocks) return mockCompanies;
     return request<CompanyRecord[]>(`/runs/${runId}/companies`);
   },
-  async updateDraft(runId: string, draft: Pick<EmailDraft, "to" | "subject" | "body_text" | "body_html">) {
+  async updateDraft(runId: string, companyName: string, draft: Pick<EmailDraft, "to" | "subject" | "body_text" | "body_html">) {
     if (useMocks) return { ...mockDraft, ...draft };
     return request<EmailDraft>(`/runs/${runId}/drafts`, {
       method: "PUT",
-      body: JSON.stringify(draft),
+      body: JSON.stringify({ company_name: companyName, ...draft }),
     });
   },
   async enqueueDraft(runId: string) {
