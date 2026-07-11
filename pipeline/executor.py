@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from pipeline.application import ApplicationPipeline
+from pipeline.builder import ApplicationPipelineBuilder
 from pipeline.config import PipelineOptions
 from pipeline.types import ALL_PIPELINE_STEPS, PipelineStep
 
@@ -49,18 +51,13 @@ class PipelineExecutionService:
         try:
             observer.pipeline_started()
             pipeline = _build_pipeline(request)
-            for step in request.steps:
-                observer.step_started(step)
-                pipeline.run(steps=(step,))
-                observer.step_completed(step)
+            pipeline.run(steps=request.steps, observer=observer)
             observer.pipeline_completed()
         except Exception as error:
             observer.pipeline_failed(str(error))
 
 
-def _build_pipeline(request: PipelineExecutionRequest):
-    from pipeline.builder import ApplicationPipelineBuilder
-
+def _build_pipeline(request: PipelineExecutionRequest) -> ApplicationPipeline:
     return (
         ApplicationPipelineBuilder(project_root=Path("."))
         .with_resume(request.resume_path)

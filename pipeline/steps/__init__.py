@@ -5,7 +5,6 @@ from pipeline.steps.handlers import (
     ParseResumeStep,
     ProcessMailQueueStep,
     RankProjectsStep,
-    ensure_services_ready,
 )
 
 __all__ = [
@@ -15,5 +14,4 @@ __all__ = [
     "ParseResumeStep",
     "ProcessMailQueueStep",
     "RankProjectsStep",
-    "ensure_services_ready",
 ]
