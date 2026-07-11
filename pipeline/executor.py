@@ -40,6 +40,8 @@ class PipelineExecutionObserver(Protocol):
 
     def step_completed(self, step: PipelineStep) -> None: ...
 
+    def step_failed(self, step: PipelineStep, error: str) -> None: ...
+
 
 class PipelineExecutionService:
     def execute(
