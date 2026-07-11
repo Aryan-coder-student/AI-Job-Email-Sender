@@ -26,6 +26,7 @@ class PipelineOptions:
     steps: tuple[PipelineStep, ...] | None = None
 
     def resolved_steps(self) -> tuple[PipelineStep, ...]:
-        if self.steps is not None:
-            return self.steps
+        return self.steps if self.steps is not None else self._steps_from_start()
+
+    def _steps_from_start(self) -> tuple[PipelineStep, ...]:
         return tuple(step for step in PipelineStep if step.value >= self.from_step)

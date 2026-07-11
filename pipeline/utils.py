@@ -13,21 +13,38 @@ def resolve_recipient_email(
     parsed_resume: ParsedResume | None,
     explicit_email: str | None,
 ) -> str:
-    if explicit_email and explicit_email.strip():
-        return explicit_email.strip()
+    return _first_available_email(
+        (
+            explicit_email,
+            _company_hr_email(company_name=company_name, companies=companies),
+            _resume_email(parsed_resume),
+        )
+    )
 
-    for record in companies:
-        if str(record.get("company_name") or "").strip().lower() == company_name.strip().lower():
-            hr_email = str(record.get("hr_email") or "").strip()
-            if hr_email:
-                return hr_email
 
-    if parsed_resume is not None:
-        for email in parsed_resume.links.emails:
-            cleaned = str(email).strip()
-            if cleaned:
-                return cleaned
+def _company_hr_email(*, company_name: str, companies: list[dict[str, Any]]) -> str | None:
+    return next(
+        (
+            record["hr_email"]
+            for record in companies
+            if record.get("company_name") == company_name and record.get("hr_email")
+        ),
+        None,
+    )
 
+
+def _resume_email(parsed_resume: ParsedResume | None) -> str | None:
+    return (
+        next(iter(parsed_resume.links.emails), None)
+        if parsed_resume is not None
+        else None
+    )
+
+
+def _first_available_email(candidates: tuple[str | None, ...]) -> str:
+    email = next((candidate for candidate in candidates if candidate), None)
+    if email is not None:
+        return email
     raise PipelineConfigurationError(
         "No recipient email found. Pass recipient_email or ensure resume links.emails is populated."
     )

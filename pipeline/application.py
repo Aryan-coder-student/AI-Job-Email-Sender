@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Protocol
 
 from pipeline.config import PipelineOptions
 from pipeline.context import PipelineContext, PipelineResult
-from pipeline.exceptions import PipelineConfigurationError, PipelineStepError
-from pipeline.steps.base import StepHandler
+from pipeline.exceptions import PipelineStepError
+from pipeline.service_readiness import ensure_required_services_ready
+from pipeline.steps.base import BaseStepHandler
 from pipeline.steps.handlers import (
     BuildGraphStep,
     GenerateDraftStep,
@@ -14,12 +15,16 @@ from pipeline.steps.handlers import (
     ParseResumeStep,
     ProcessMailQueueStep,
     RankProjectsStep,
-    ensure_services_ready,
 )
 from pipeline.types import PipelineStep
+from pipeline.validation import (
+    validate_execution_plan,
+    validate_from_step,
+    validate_step_handlers_registered,
+    validate_steps_selected,
+)
 
-
-DEFAULT_STEP_HANDLERS: Mapping[PipelineStep, StepHandler] = {
+DEFAULT_STEP_HANDLERS: Mapping[PipelineStep, BaseStepHandler] = {
     PipelineStep.PARSE_RESUME: ParseResumeStep(),
     PipelineStep.PARSE_GITHUB: ParseGitHubStep(),
     PipelineStep.BUILD_GRAPH: BuildGraphStep(),
@@ -29,6 +34,23 @@ DEFAULT_STEP_HANDLERS: Mapping[PipelineStep, StepHandler] = {
 }
 
 
+class PipelineStepObserver(Protocol):
+    def step_started(self, step: PipelineStep) -> None: ...
+
+    def step_completed(self, step: PipelineStep) -> None: ...
+
+
+class _NoopStepObserver:
+    def step_started(self, step: PipelineStep) -> None:
+        pass
+
+    def step_completed(self, step: PipelineStep) -> None:
+        pass
+
+
+StepExecutionPlan = tuple[tuple[PipelineStep, BaseStepHandler], ...]
+
+
 class ApplicationPipeline:
     def __init__(
         self,
@@ -36,7 +58,7 @@ class ApplicationPipeline:
         context: PipelineContext,
         options: PipelineOptions,
         project_root: Path,
-        step_handlers: Mapping[PipelineStep, StepHandler] | None = None,
+        step_handlers: Mapping[PipelineStep, BaseStepHandler] | None = None,
     ) -> None:
         self._context = context
         self._options = options
@@ -51,60 +73,60 @@ class ApplicationPipeline:
     def options(self) -> PipelineOptions:
         return self._options
 
-    def run(self, steps: tuple[PipelineStep, ...] | None = None) -> PipelineResult:
-        selected_steps = steps or self._options.resolved_steps()
-        self._validate_steps(selected_steps)
+    def run(
+        self,
+        steps: tuple[PipelineStep, ...] | None = None,
+        *,
+        observer: PipelineStepObserver | None = None,
+    ) -> PipelineResult:
+        execution_plan = self._prepare_execution_plan(self._selected_steps(steps))
+        step_observer = observer or _NoopStepObserver()
+        executed_steps = tuple(
+            self._execute_step(step, handler, step_observer)
+            for step, handler in execution_plan
+        )
 
-        if not self._options.skip_services and self._needs_service_check(selected_steps):
-            ensure_services_ready(project_root=self._project_root)
+        return PipelineResult(context=self._context, steps_executed=executed_steps)
 
-        if self._options.from_step > 1:
-            self._context.load_artifact_state(from_step=self._options.from_step)
+    def _selected_steps(
+        self,
+        steps: tuple[PipelineStep, ...] | None,
+    ) -> tuple[PipelineStep, ...]:
+        return self._options.resolved_steps() if steps is None else steps
 
-        executed: list[int] = []
-        for step in selected_steps:
-            handler = self._step_handlers.get(step)
-            if handler is None:
-                raise PipelineConfigurationError(f"No handler registered for step {step.name}.")
-
-            try:
-                handler.execute(self._context, self._options)
-            except PipelineStepError:
-                raise
-            except Exception as error:
-                raise PipelineStepError(f"Step {step.name} failed: {error}") from error
-
-            executed.append(step.value)
-
-        return PipelineResult(context=self._context, steps_executed=tuple(executed))
-
-    def _needs_service_check(self, steps: tuple[PipelineStep, ...]) -> bool:
-        service_steps = {
-            PipelineStep.BUILD_GRAPH,
-            PipelineStep.RANK_PROJECTS,
-        }
-        return any(step in service_steps for step in steps)
-
-    def _validate_steps(self, steps: tuple[PipelineStep, ...]) -> None:
-        if not steps:
-            raise PipelineConfigurationError("At least one pipeline step must be selected.")
-
-        if self._options.from_step < 1 or self._options.from_step > 6:
-            raise PipelineConfigurationError("from_step must be between 1 and 6.")
-
-        if PipelineStep.PARSE_RESUME in steps and self._context.resume_path is None:
-            raise PipelineConfigurationError("resume_path is required when running PARSE_RESUME.")
-
-        if self._context.companies_path is None and self._context.companies is None:
-            if any(
-                step in steps
-                for step in (
-                    PipelineStep.BUILD_GRAPH,
-                    PipelineStep.RANK_PROJECTS,
-                    PipelineStep.GENERATE_DRAFT,
-                )
-            ):
-                raise PipelineConfigurationError("companies_path or companies data is required.")
+    def _prepare_execution_plan(self, steps: tuple[PipelineStep, ...]) -> StepExecutionPlan:
+        validate_steps_selected(steps)
+        validate_from_step(self._options.from_step)
 
         self._context.output_dir = self._options.output_dir
         self._context.ensure_output_dir()
+        execution_plan = self._execution_plan_for(steps)
+        validate_execution_plan(execution_plan, self._context, self._options)
+        ensure_required_services_ready(
+            project_root=self._project_root,
+            skip_services=self._options.skip_services,
+            execution_plan=execution_plan,
+        )
+        self._context.load_artifact_state(from_step=self._options.from_step)
+        return execution_plan
+
+    def _execution_plan_for(self, steps: tuple[PipelineStep, ...]) -> StepExecutionPlan:
+        validate_step_handlers_registered(steps, self._step_handlers)
+        return tuple((step, self._step_handlers[step]) for step in steps)
+
+    def _execute_step(
+        self,
+        step: PipelineStep,
+        handler: BaseStepHandler,
+        observer: PipelineStepObserver,
+    ) -> int:
+        try:
+            observer.step_started(step)
+            handler.execute(self._context, self._options)
+            observer.step_completed(step)
+        except PipelineStepError:
+            raise
+        except Exception as error:
+            raise PipelineStepError(f"Step {step.name} failed: {error}") from error
+
+        return step.value
