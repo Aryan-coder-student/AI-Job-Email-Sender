@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
 from app.modules.graph.serializers import load_json_file
 from pipeline.application import DEFAULT_STEP_HANDLERS, ApplicationPipeline
 from pipeline.config import PipelineOptions
 from pipeline.context import PipelineContext
-from pipeline.exceptions import PipelineConfigurationError
-from pipeline.steps.base import StepHandler
+from pipeline.steps.base import BaseStepHandler
 from pipeline.types import PipelineStep
+from pipeline.validation import validate_companies_file
 
 
 class ApplicationPipelineBuilder:
@@ -18,7 +18,7 @@ class ApplicationPipelineBuilder:
         self._project_root = project_root or Path.cwd()
         self._context = PipelineContext()
         self._options = PipelineOptions()
-        self._step_handlers: Mapping[PipelineStep, StepHandler] | None = None
+        self._step_handlers: Mapping[PipelineStep, BaseStepHandler] | None = None
 
     def with_resume(self, resume_path: str | Path) -> ApplicationPipelineBuilder:
         self._context.resume_path = Path(resume_path)
@@ -56,7 +56,7 @@ class ApplicationPipelineBuilder:
 
     def with_step_handlers(
         self,
-        handlers: Mapping[PipelineStep, StepHandler],
+        handlers: Mapping[PipelineStep, BaseStepHandler],
     ) -> ApplicationPipelineBuilder:
         self._step_handlers = handlers
         return self
@@ -72,12 +72,11 @@ class ApplicationPipelineBuilder:
         )
 
     def _load_companies_if_needed(self) -> None:
-        if not self._context.companies_path or self._context.companies is not None:
+        companies_path = self._context.companies_path
+        if companies_path is None or self._context.companies is not None:
             return
 
-        if not self._context.companies_path.is_file():
-            raise PipelineConfigurationError(
-                f"Companies file not found: {self._context.companies_path}"
-            )
+        self._context.companies = self._load_companies(companies_path)
 
-        self._context.companies = load_json_file(str(self._context.companies_path))
+    def _load_companies(self, companies_path: Path) -> list[dict[str, Any]]:
+        return load_json_file(str(validate_companies_file(companies_path)))
