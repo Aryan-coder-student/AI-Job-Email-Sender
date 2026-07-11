@@ -18,6 +18,8 @@ coverage.xml
 
 # Output / Data
 parsed.json
+frontend/node_modules/
+frontend/dist/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

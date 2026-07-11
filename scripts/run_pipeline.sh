@@ -10,4 +10,4 @@ else
   PYTHON="python3"
 fi
 
-exec "$PYTHON" -m pipeline.cli "$@"
+exec "$PYTHON" -m cli.pipeline "$@"
