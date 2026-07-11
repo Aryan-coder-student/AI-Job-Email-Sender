@@ -98,8 +98,15 @@ class PipelineRunStore:
         if not isinstance(drafts, dict):
             return None
 
-        editable = {key: value for key, value in payload.items() if key in _DRAFT_EDIT_FIELDS}
-        for company_name in drafts:
+        target_company = _optional_str(payload.get("company_name"))
+        if target_company and target_company not in drafts:
+            return None
+
+        editable = {
+            key: value for key, value in payload.items() if key in _DRAFT_EDIT_FIELDS
+        }
+        target_companies = [target_company] if target_company else drafts.keys()
+        for company_name in target_companies:
             drafts[company_name] = {**drafts[company_name], **editable, "status": "draft"}
 
         self._write_artifact(run_id, "drafts", drafts)
