@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from app.api.v1.schemas.runs import ProcessMailRequest
 from app.api.v1.services.run_store import PipelineRunStore
 from app.api.v1.services.system_status import build_system_status
 from app.core.exceptions import InvalidExcelError
@@ -155,6 +156,65 @@ def test_run_store_executes_runs_through_pipeline_service(tmp_path: Path) -> Non
     assert completed_run["steps"][0]["status"] == "completed"
 
 
+def test_run_store_updates_and_enqueues_draft_map(tmp_path: Path) -> None:
+    store = PipelineRunStore(output_dir=tmp_path)
+    run = store.create_run(
+        config={"target_company": "Acme"},
+        selected_companies=[{"company_name": "Acme"}, {"company_name": "Beta"}],
+    )
+    _write_artifact(
+        store,
+        run["run_id"],
+        "drafts",
+        {
+            "Acme": _draft("draft-acme", company_name="Acme", subject="Old"),
+            "Beta": _draft("draft-beta", company_name="Beta", subject="Old"),
+        },
+    )
+
+    updated = store.update_draft(
+        run["run_id"],
+        {"subject": "Updated subject", "body_text": "Updated body"},
+    )
+
+    assert updated is not None
+    assert set(updated) == {"Acme", "Beta"}
+    assert updated["Acme"]["subject"] == "Updated subject"
+    assert updated["Beta"]["body_text"] == "Updated body"
+    assert store.get_artifact(run["run_id"], "drafts") == updated
+
+    queued = store.enqueue_draft(run["run_id"])
+
+    assert queued is not None
+    assert {draft["status"] for draft in queued.values()} == {"queued"}
+    assert store.get_artifact(run["run_id"], "drafts") == queued
+
+
+def test_process_mail_request_defaults_to_dry_run() -> None:
+    payload = ProcessMailRequest()
+
+    assert payload.dry_run is True
+    assert payload.limit == 10
+
+
+def test_run_store_process_mail_delegates_to_mail_processor(tmp_path: Path) -> None:
+    processor = _FakeMailProcessor()
+    store = PipelineRunStore(output_dir=tmp_path, mail_processor=processor)
+    run = store.create_run(
+        config={"target_company": "Acme"},
+        selected_companies=[{"company_name": "Acme"}],
+    )
+
+    result = store.process_mail(run["run_id"], dry_run=True, limit=2)
+
+    assert processor.calls == [{"dry_run": True, "limit": 2}]
+    assert result == [
+        {"draft_id": "draft-1", "to": "one@example.test", "status": "dry_run"},
+        {"draft_id": "draft-2", "to": "two@example.test", "status": "dry_run"},
+    ]
+    assert store.get_artifact(run["run_id"], "mail") == result
+
+
 def test_system_status_masks_secret_values(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_API_KEY_1", "secret")
     reset_settings()
@@ -176,3 +236,43 @@ class _FakePipelineExecutor:
         observer.step_started(PipelineStep.PARSE_RESUME)
         observer.step_completed(PipelineStep.PARSE_RESUME)
         observer.pipeline_completed()
+
+
+class _FakeMailProcessor:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def __call__(self, *, limit: int, dry_run: bool) -> list[dict[str, object]]:
+        self.calls.append({"dry_run": dry_run, "limit": limit})
+        rows = [
+            {"draft_id": "draft-1", "to": "one@example.test", "status": "dry_run"},
+            {"draft_id": "draft-2", "to": "two@example.test", "status": "dry_run"},
+            {"draft_id": "draft-3", "to": "three@example.test", "status": "dry_run"},
+        ]
+        return rows[:limit]
+
+
+def _write_artifact(
+    store: PipelineRunStore,
+    run_id: str,
+    artifact_type: str,
+    payload: object,
+) -> None:
+    artifact_path = store._artifact_path(run_id, artifact_type)
+    assert artifact_path is not None
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _draft(draft_id: str, *, company_name: str, subject: str) -> dict[str, object]:
+    return {
+        "draft_id": draft_id,
+        "to": f"{company_name.lower()}@example.test",
+        "subject": subject,
+        "body_text": "Body",
+        "body_html": None,
+        "company_name": company_name,
+        "project_name": "Project",
+        "status": "draft",
+        "metadata": {},
+    }

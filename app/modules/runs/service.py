@@ -5,8 +5,9 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import Any, Callable
 
+from app.modules.mail.tasks.runner import run_process_email_queue
 from app.modules.runs.model import (
     ARTIFACT_FILES,
     PIPELINE_STEPS,
@@ -27,10 +28,12 @@ class PipelineRunStore:
         *,
         output_dir: Path | str = "data",
         executor: PipelineExecutionService | None = None,
+        mail_processor: Callable[..., list[dict[str, Any]]] | None = None,
     ) -> None:
         self.output_dir = Path(output_dir)
         self._repository = JsonRunRepository(output_dir=self.output_dir)
         self._executor = executor or PipelineExecutionService()
+        self._mail_processor = mail_processor or run_process_email_queue
         self._lock = Lock()
         self._runs = self._repository.load_runs()
         self._seed_demo_run()
@@ -91,41 +94,44 @@ class PipelineRunStore:
         if self.get_run(run_id) is None:
             return None
 
-        drafts = self.get_artifact(run_id, "drafts") or {}
+        drafts = self.get_artifact(run_id, "drafts")
+        if not isinstance(drafts, dict):
+            return None
+
         editable = {key: value for key, value in payload.items() if key in _DRAFT_EDIT_FIELDS}
-        # Apply edits to all drafts
         for company_name in drafts:
             drafts[company_name] = {**drafts[company_name], **editable, "status": "draft"}
-        
-        artifact_path = self._artifact_path(run_id, "drafts")
-        if artifact_path:
-            artifact_path.write_text(json.dumps(drafts, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        
+
+        self._write_artifact(run_id, "drafts", drafts)
         return drafts
 
     def enqueue_draft(self, run_id: str) -> dict[str, Any] | None:
         drafts = self.get_artifact(run_id, "drafts")
-        if drafts is None:
+        if not isinstance(drafts, dict):
             return None
+
         for company_name in drafts:
             drafts[company_name]["status"] = "queued"
-        
-        artifact_path = self._artifact_path(run_id, "drafts")
-        if artifact_path:
-            artifact_path.write_text(json.dumps(drafts, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        
+
+        self._write_artifact(run_id, "drafts", drafts)
         return drafts
 
     def process_mail(self, run_id: str, *, dry_run: bool, limit: int) -> list[dict[str, Any]] | None:
         if self.get_run(run_id) is None:
             return None
 
-        mail_result = self.get_artifact(run_id, "mail")
-        if isinstance(mail_result, list) and mail_result:
-            return mail_result[:limit]
+        try:
+            result = self._mail_processor(limit=limit, dry_run=dry_run)
+        except Exception:
+            mail_result = self.get_artifact(run_id, "mail")
+            if isinstance(mail_result, list) and mail_result:
+                return mail_result[:limit]
 
-        draft = self.get_artifact(run_id, "drafts") or {}
-        return [_fallback_mail_result(run_id=run_id, draft=draft, dry_run=dry_run)]
+            drafts = self.get_artifact(run_id, "drafts") or {}
+            return [_fallback_mail_result(run_id=run_id, drafts=drafts, dry_run=dry_run)]
+
+        self._write_artifact(run_id, "mail", result)
+        return result
 
     def get_companies(self, run_id: str) -> list[dict[str, Any]] | None:
         run = self._get_record(run_id)
@@ -145,6 +151,17 @@ class PipelineRunStore:
             return None
 
         return json.loads(artifact_path.read_text(encoding="utf-8"))
+
+    def _write_artifact(self, run_id: str, artifact_type: str, payload: Any) -> None:
+        artifact_path = self._artifact_path(run_id, artifact_type)
+        if artifact_path is None:
+            return
+
+        artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        artifact_path.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
 
     def mark_run_running(self, run_id: str) -> None:
         self._update_run(run_id, status="running", log="Pipeline orchestration started.")
@@ -429,14 +446,22 @@ def _step_key(step: PipelineStep) -> str:
 def _fallback_mail_result(
     *,
     run_id: str,
-    draft: dict[str, Any],
+    drafts: dict[str, Any],
     dry_run: bool,
 ) -> dict[str, Any]:
+    draft = _first_draft(drafts)
     return {
         "draft_id": draft.get("draft_id") or run_id,
         "to": draft.get("to"),
         "status": "dry_run" if dry_run else "queued",
     }
+
+
+def _first_draft(drafts: dict[str, Any]) -> dict[str, Any]:
+    for draft in drafts.values():
+        if isinstance(draft, dict):
+            return draft
+    return {}
 
 
 def _artifact_summary(artifact_type: str | None, artifact_path: Path | None) -> str | None:

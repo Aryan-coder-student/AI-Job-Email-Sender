@@ -13,6 +13,7 @@ import type {
   CompanyImportPreview,
   CompanyRecord,
   EmailDraft,
+  EmailDraftMap,
   MailQueueResult,
   MatchResult,
   NewRunFormValues,
@@ -157,16 +158,19 @@ export const api = {
     if (useMocks) return mockCompanies;
     return request<CompanyRecord[]>(`/runs/${runId}/companies`);
   },
-  async updateDraft(runId: string, draft: Pick<EmailDraft, "to" | "subject" | "body_text" | "body_html">) {
-    if (useMocks) return { ...mockDraft, ...draft };
-    return request<EmailDraft>(`/runs/${runId}/drafts`, {
+  async updateDraft(
+    runId: string,
+    draft: Pick<EmailDraft, "to" | "subject" | "body_text" | "body_html">,
+  ): Promise<EmailDraftMap> {
+    if (useMocks) return { [mockDraft.company_name]: { ...mockDraft, ...draft } };
+    return request<EmailDraftMap>(`/runs/${runId}/drafts`, {
       method: "PUT",
       body: JSON.stringify(draft),
     });
   },
-  async enqueueDraft(runId: string) {
-    if (useMocks) return { ...mockDraft, status: "queued" as const };
-    return request<EmailDraft>(`/runs/${runId}/drafts/enqueue`, { method: "POST" });
+  async enqueueDraft(runId: string): Promise<EmailDraftMap> {
+    if (useMocks) return { [mockDraft.company_name]: { ...mockDraft, status: "queued" as const } };
+    return request<EmailDraftMap>(`/runs/${runId}/drafts/enqueue`, { method: "POST" });
   },
   async processMail(runId: string, payload: { dry_run: boolean; limit: number }) {
     if (useMocks) return mockMail;
@@ -195,7 +199,7 @@ function mockArtifact<T>(artifactType: ArtifactType): T {
     github: mockGithub satisfies ParsedGitHubProfile,
     graph: {},
     matches: mockMatches satisfies MatchResult[],
-    drafts: mockDraft satisfies EmailDraft,
+    drafts: { [mockDraft.company_name]: mockDraft } satisfies EmailDraftMap,
     mail: mockMail satisfies MailQueueResult[],
   };
   return artifacts[artifactType] as T;

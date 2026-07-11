@@ -129,6 +129,8 @@ export interface EmailDraft {
   metadata: Record<string, unknown>;
 }
 
+export type EmailDraftMap = Record<string, EmailDraft>;
+
 export interface MailQueueResult {
   draft_id: string;
   to?: string | null;
