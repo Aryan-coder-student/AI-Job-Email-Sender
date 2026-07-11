@@ -127,6 +127,20 @@ class Neo4jGraphStore:
         LIMIT $limit
         """
 
+        job_tech_query = """
+        MATCH (job:JobOpening {node_id: $job_id})-[:REQUIRES]->(tech:Technology)<-[:USES]-(project:Project)<-[:OWNS]-(candidate:Candidate {node_id: $candidate_id})
+        RETURN project.node_id AS project_id, project.name AS project_name, tech.name AS capability, count(*) AS hits
+        ORDER BY hits DESC
+        LIMIT $limit
+        """
+
+        company_tech_query = """
+        MATCH (company:Company {node_id: $company_id})-[:LOOKS_FOR]->(tech:Technology)<-[:USES]-(project:Project)<-[:OWNS]-(candidate:Candidate {node_id: $candidate_id})
+        RETURN project.node_id AS project_id, project.name AS project_name, tech.name AS capability, count(*) AS hits
+        ORDER BY hits DESC
+        LIMIT $limit
+        """
+
         project_scores: dict[str, dict[str, Any]] = {}
         paths: list[MatchPath] = []
 
@@ -145,7 +159,23 @@ class Neo4jGraphStore:
                         employer.company_name,
                         path_prefix=["JobOpening", "REQUIRES", record["capability"], "DEMONSTRATED_BY"],
                         weight=0.7,
-                        match_source="job",
+                        match_source="job_capability",
+                    )
+                
+                for record in session.run(
+                    job_tech_query,
+                    job_id=job_id,
+                    candidate_id=candidate_id,
+                    limit=limit,
+                ):
+                    _accumulate_score(
+                        project_scores,
+                        paths,
+                        record,
+                        employer.company_name,
+                        path_prefix=["JobOpening", "REQUIRES", record["capability"], "USED_IN"],
+                        weight=0.6,
+                        match_source="job_technology",
                     )
 
             for record in session.run(
@@ -162,7 +192,24 @@ class Neo4jGraphStore:
                     employer.company_name,
                     path_prefix=["Company", "LOOKS_FOR", record["capability"], "DEMONSTRATED_BY"],
                     weight=weight,
-                    match_source="company",
+                    match_source="company_capability",
+                )
+
+            for record in session.run(
+                company_tech_query,
+                company_id=company_id,
+                candidate_id=candidate_id,
+                limit=limit,
+            ):
+                weight = 0.3 if use_job_paths else 0.8
+                _accumulate_score(
+                    project_scores,
+                    paths,
+                    record,
+                    employer.company_name,
+                    path_prefix=["Company", "LOOKS_FOR", record["capability"], "USED_IN"],
+                    weight=weight,
+                    match_source="company_technology",
                 )
 
             for record in session.run(
