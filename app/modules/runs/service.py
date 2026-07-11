@@ -91,13 +91,30 @@ class PipelineRunStore:
         if self.get_run(run_id) is None:
             return None
 
-        draft = self.get_artifact(run_id, "draft") or {}
+        drafts = self.get_artifact(run_id, "drafts") or {}
         editable = {key: value for key, value in payload.items() if key in _DRAFT_EDIT_FIELDS}
-        return {**draft, **editable, "status": "draft"}
+        # Apply edits to all drafts
+        for company_name in drafts:
+            drafts[company_name] = {**drafts[company_name], **editable, "status": "draft"}
+        
+        artifact_path = self._artifact_path(run_id, "drafts")
+        if artifact_path:
+            artifact_path.write_text(json.dumps(drafts, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        
+        return drafts
 
     def enqueue_draft(self, run_id: str) -> dict[str, Any] | None:
-        draft = self.get_artifact(run_id, "draft")
-        return {**draft, "status": "queued"} if draft is not None else None
+        drafts = self.get_artifact(run_id, "drafts")
+        if drafts is None:
+            return None
+        for company_name in drafts:
+            drafts[company_name]["status"] = "queued"
+        
+        artifact_path = self._artifact_path(run_id, "drafts")
+        if artifact_path:
+            artifact_path.write_text(json.dumps(drafts, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        
+        return drafts
 
     def process_mail(self, run_id: str, *, dry_run: bool, limit: int) -> list[dict[str, Any]] | None:
         if self.get_run(run_id) is None:
@@ -107,7 +124,7 @@ class PipelineRunStore:
         if isinstance(mail_result, list) and mail_result:
             return mail_result[:limit]
 
-        draft = self.get_artifact(run_id, "draft") or {}
+        draft = self.get_artifact(run_id, "drafts") or {}
         return [_fallback_mail_result(run_id=run_id, draft=draft, dry_run=dry_run)]
 
     def get_companies(self, run_id: str) -> list[dict[str, Any]] | None:
@@ -439,9 +456,11 @@ def _summarize_artifact(artifact_type: str, payload: Any) -> str | None:
         return str(payload.get("candidate_name") or payload.get("filename") or "Parsed resume")
     if artifact_type == "github":
         return f"{len(payload.get('projects') or [])} GitHub projects"
-    if artifact_type == "matches" and isinstance(payload, list):
-        return f"{len(payload)} ranked matches"
-    if artifact_type == "draft":
+    if artifact_type == "matches" and isinstance(payload, dict):
+        return f"{len(payload)} companies ranked"
+    if artifact_type == "drafts":
+        if isinstance(payload, dict):
+            return f"{len(payload)} email drafts generated"
         return str(payload.get("subject") or "Generated draft")
     if artifact_type == "mail" and isinstance(payload, list):
         return f"{len(payload)} mail results"
