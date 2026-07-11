@@ -93,9 +93,14 @@ class PipelineRunStore:
 
         drafts = self.get_artifact(run_id, "drafts") or {}
         editable = {key: value for key, value in payload.items() if key in _DRAFT_EDIT_FIELDS}
-        # Apply edits to all drafts
-        for company_name in drafts:
+        company_name = payload.get("company_name")
+        
+        if company_name and company_name in drafts:
             drafts[company_name] = {**drafts[company_name], **editable, "status": "draft"}
+        else:
+            # Apply edits to all drafts
+            for name in drafts:
+                drafts[name] = {**drafts[name], **editable, "status": "draft"}
         
         artifact_path = self._artifact_path(run_id, "drafts")
         if artifact_path:
