@@ -95,13 +95,12 @@ pipeline = (
     ApplicationPipelineBuilder(project_root=Path("."))
     .with_resume("data/AryanPahari.pdf")
     .with_companies("data/companies_sheet.json")
-    .with_target_company("10up")
     .with_options(PipelineOptions(dry_run=True, from_step=1))
     .build()
 )
 
 result = pipeline.run()
-print(result.context.draft)
+print(result.context.drafts)
 ```
 
 Run a custom subset of steps:
@@ -119,8 +118,8 @@ result = pipeline.run(
 CLI entrypoint (also used by `scripts/run_pipeline.sh`):
 
 ```bash
-.venv/bin/python -m pipeline.cli --from-step 5 --dry-run
-.venv/bin/python -m pipeline.cli --steps parse_resume parse_github build_graph
+.venv/bin/python -m cli.pipeline --from-step 5 --dry-run
+.venv/bin/python -m cli.pipeline --steps parse_resume parse_github build_graph
 ```
 
 ### Pipeline steps
@@ -129,7 +128,7 @@ CLI entrypoint (also used by `scripts/run_pipeline.sh`):
 2. **Parse GitHub** → `data/github_projects_resume.json`
 3. **Build graph + vectors** → `data/graph_build.json`
 4. **Rank projects** → `data/matches.json`
-5. **Generate draft** → `data/draft.json` (includes GitHub project links; deployed URL preferred over repo URL)
+5. **Generate draft** → `data/drafts.json` (includes GitHub project links; deployed URL preferred over repo URL)
 6. **Process mail queue** → `data/mail_queue_result.json`
 
 ## CLI reference
@@ -195,7 +194,7 @@ Read `candidate_id` from `data/graph_build.json` → `candidate.metadata.candida
   --companies data/companies_sheet.json \
   --company 10up \
   --recipient-email you@example.com \
-  --output-file data/draft.json
+  --output-file data/drafts.json
 ```
 
 Drafts append a **GitHub project links** section (deployed link when available, otherwise repo link).
@@ -219,6 +218,41 @@ Requires `SMTP_USERNAME` and `SMTP_PASSWORD` only when sending (not in `--dry-ru
 ```bash
 .venv/bin/python -m celery -A app.celery.app worker --loglevel=info
 ```
+
+## Frontend Cockpit
+
+The React/Vite frontend lives in `frontend/` and consumes the API at
+`VITE_API_BASE_URL`.
+
+Install frontend dependencies:
+
+```bash
+cd frontend
+npm install
+cp .env.example .env.local
+```
+
+Run the backend API:
+
+```bash
+.venv/bin/python -m uvicorn app.api.main:app --reload
+```
+
+Run the frontend:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Useful frontend checks:
+
+```bash
+npm run test
+npm run build
+```
+
+For local UI-only work, set `VITE_USE_MOCKS=true` in `frontend/.env.local`.
 
 Tasks live under `app/modules/*/tasks/` (graph, emails, matching, mail).
 
