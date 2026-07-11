@@ -10,6 +10,8 @@ from app.api.v1.services.system_status import build_system_status
 from app.core.exceptions import InvalidExcelError
 from app.core.settings import reset_settings
 from app.modules.company_imports import preview_company_import
+from app.modules.company_imports.service import preview_company_import_from_url
+from app.modules.excel.parser import ParsedExcelRow, ParsedExcelSheet, ParsedExcelWorkbook
 from pipeline.types import PipelineStep
 
 
@@ -65,6 +67,44 @@ def test_company_import_preview_parses_csv_and_flags_invalid_rows(tmp_path: Path
     assert preview["rows"][0]["normalized"]["company_name"] == "Acme"
     assert preview["rows"][1]["issues"] == ["Company name is required."]
     assert (tmp_path / "imports" / f"{preview['import_id']}.json").is_file()
+
+
+def test_company_import_preview_parses_google_sheet_url(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    workbook = ParsedExcelWorkbook(
+        filename="google-sheet-sheet-id.xlsx",
+        sheets=[
+            ParsedExcelSheet(
+                name="Companies",
+                headers=["company", "role"],
+                total_populated_rows=1,
+                rows=[
+                    ParsedExcelRow(
+                        sheet_name="Companies",
+                        row_number=2,
+                        data={"company": "Acme", "role": "Backend"},
+                        normalized={"company_name": "Acme", "role": "Backend"},
+                    )
+                ],
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        "app.modules.company_imports.service.parse_excel_from_url",
+        lambda url, config: workbook,
+    )
+
+    preview = preview_company_import_from_url(
+        url="https://docs.google.com/spreadsheets/d/sheet-id/edit#gid=1",
+        output_dir=tmp_path,
+    )
+
+    assert preview["filename"] == "google-sheet-sheet-id.xlsx"
+    assert preview["valid_rows"] == 1
+    assert preview["rows"][0]["normalized"]["company_name"] == "Acme"
+    assert preview["rows"][0]["source_sheet"] == "Companies"
 
 
 def test_company_import_preview_rejects_invalid_json_rows(tmp_path: Path) -> None:

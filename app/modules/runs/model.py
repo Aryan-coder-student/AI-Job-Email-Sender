@@ -11,7 +11,7 @@ ARTIFACT_FILES: dict[str, str] = {
     "github": "github_projects_resume.json",
     "graph": "graph_build.json",
     "matches": "matches.json",
-    "draft": "draft.json",
+    "drafts": "drafts.json",
     "mail": "mail_queue_result.json",
 }
 
@@ -20,7 +20,7 @@ PIPELINE_STEPS = (
     ("parse_github", "Parse GitHub", "github"),
     ("build_graph", "Build Graph + Vectors", "graph"),
     ("rank_projects", "Rank Projects", "matches"),
-    ("generate_draft", "Generate Draft", "draft"),
+    ("generate_draft", "Generate Draft", "drafts"),
     ("process_mail_queue", "Process Mail Queue", "mail"),
 )
 

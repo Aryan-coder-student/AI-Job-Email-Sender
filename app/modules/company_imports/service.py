@@ -11,7 +11,8 @@ from app.core.exceptions import InvalidExcelError
 from app.modules.company_imports.model import CompanyImportPreview, CompanyImportRow
 from app.modules.company_imports.repository import CompanyImportRepository
 from app.modules.excel.config import ExcelParserConfig
-from app.modules.excel.parser import ParsedExcelRow, parse_excel_from_upload
+from app.modules.excel.parser import ParsedExcelRow, ParsedExcelWorkbook, parse_excel_from_upload
+from app.modules.excel.sources import parse_excel_from_url
 from app.modules.excel.utils import build_alias_lookup, build_headers, normalize_data, row_to_dict
 
 SUPPORTED_COMPANY_IMPORT_EXTENSIONS = {".csv", ".json", ".xlsx", ".xlsm", ".xltx", ".xltm"}
@@ -23,23 +24,40 @@ def preview_company_import(
     content: bytes,
     filename: str,
     output_dir: Path,
+    config: ExcelParserConfig | None = None,
 ) -> dict[str, Any]:
     preview = CompanyImportPreview(
         import_id=uuid.uuid4().hex,
         filename=filename,
-        rows=parse_company_import_rows(content=content, filename=filename),
+        rows=parse_company_import_rows(content=content, filename=filename, config=config),
     )
     CompanyImportRepository(output_dir=output_dir).save_preview(preview)
     return preview.to_dict()
 
 
-def parse_company_import_rows(*, content: bytes, filename: str) -> list[CompanyImportRow]:
+def preview_company_import_from_url(
+    *,
+    url: str,
+    output_dir: Path,
+    config: ExcelParserConfig | None = None,
+) -> dict[str, Any]:
+    workbook = parse_excel_from_url(url, config=config or ExcelParserConfig())
+    preview = CompanyImportPreview(
+        import_id=uuid.uuid4().hex,
+        filename=workbook.filename or url,
+        rows=_excel_workbook_to_import_rows(workbook),
+    )
+    CompanyImportRepository(output_dir=output_dir).save_preview(preview)
+    return preview.to_dict()
+
+
+def parse_company_import_rows(*, content: bytes, filename: str, config: ExcelParserConfig | None = None) -> list[CompanyImportRow]:
     suffix = _supported_suffix(filename)
     if suffix == ".csv":
         return _parse_csv_rows(content=content, filename=filename)
     if suffix == ".json":
         return _parse_json_rows(content=content, filename=filename)
-    return _parse_excel_rows(content=content, filename=filename)
+    return _parse_excel_rows(content=content, filename=filename, config=config)
 
 
 def _supported_suffix(filename: str) -> str:
@@ -51,8 +69,12 @@ def _supported_suffix(filename: str) -> str:
     raise InvalidExcelError(f"Unsupported company file type. Use one of: {supported}.")
 
 
-def _parse_excel_rows(*, content: bytes, filename: str) -> list[CompanyImportRow]:
-    workbook = parse_excel_from_upload(content, filename=filename)
+def _parse_excel_rows(*, content: bytes, filename: str, config: ExcelParserConfig | None = None) -> list[CompanyImportRow]:
+    workbook = parse_excel_from_upload(content, filename=filename, config=config)
+    return _excel_workbook_to_import_rows(workbook)
+
+
+def _excel_workbook_to_import_rows(workbook: ParsedExcelWorkbook) -> list[CompanyImportRow]:
     return [_excel_row_to_import_row(row) for row in workbook.rows]
 
 
