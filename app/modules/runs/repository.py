@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from app.core.json import default_json_serializer
 from app.modules.runs.model import ARTIFACT_FILES, PipelineRunRecord
 
 
@@ -34,7 +36,7 @@ class JsonRunRepository:
         self.runs_dir.mkdir(parents=True, exist_ok=True)
         payload = [run.to_dict() for run in runs.values() if run.run_id != "local-demo"]
         self.manifest_path.write_text(
-            f"{json.dumps(payload, indent=2, ensure_ascii=False)}\n",
+            f"{json.dumps(payload, indent=2, ensure_ascii=False, default=default_json_serializer)}\n",
             encoding="utf-8",
         )
 
@@ -81,7 +83,7 @@ class JsonRunRepository:
         artifact_dir.mkdir(parents=True, exist_ok=True)
         companies_path = artifact_dir / "companies_sheet.json"
         companies_path.write_text(
-            f"{json.dumps(companies, indent=2, ensure_ascii=False)}\n",
+            f"{json.dumps(companies, indent=2, ensure_ascii=False, default=default_json_serializer)}\n",
             encoding="utf-8",
         )
         return companies_path

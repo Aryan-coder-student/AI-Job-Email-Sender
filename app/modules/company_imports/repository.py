@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from app.core.json import default_json_serializer
 from app.modules.company_imports.model import CompanyImportPreview
 
 
@@ -16,7 +18,7 @@ class CompanyImportRepository:
         imports_dir.mkdir(parents=True, exist_ok=True)
         preview_path = imports_dir / f"{preview.import_id}.json"
         preview_path.write_text(
-            f"{json.dumps(preview.to_dict(), indent=2, ensure_ascii=False)}\n",
+            f"{json.dumps(preview.to_dict(), indent=2, ensure_ascii=False, default=default_json_serializer)}\n",
             encoding="utf-8",
         )
 
