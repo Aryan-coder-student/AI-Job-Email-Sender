@@ -98,9 +98,16 @@ class PipelineRunStore:
         if not isinstance(drafts, dict):
             return None
 
-        editable = {key: value for key, value in payload.items() if key in _DRAFT_EDIT_FIELDS}
-        for company_name in drafts:
+        editable = {
+            key: value for key, value in payload.items() if key in _DRAFT_EDIT_FIELDS
+        }
+        company_name = payload.get("company_name")
+
+        if company_name and company_name in drafts:
             drafts[company_name] = {**drafts[company_name], **editable, "status": "draft"}
+        else:
+            for name in drafts:
+                drafts[name] = {**drafts[name], **editable, "status": "draft"}
 
         self._write_artifact(run_id, "drafts", drafts)
         return drafts
@@ -179,6 +186,9 @@ class PipelineRunStore:
 
     def mark_step_running(self, run_id: str, key: str) -> None:
         self._update_step(run_id, key, status="running", error=None)
+
+    def mark_step_failed(self, run_id: str, key: str, error: str) -> None:
+        self._update_step(run_id, key, status="failed", error=error)
 
     def mark_step_completed(self, run_id: str, key: str) -> None:
         artifact_type = artifact_type_for_step(key)
@@ -337,6 +347,9 @@ class _RunPipelineObserver:
 
     def step_completed(self, step: PipelineStep) -> None:
         self._store.mark_step_completed(self._run_id, _step_key(step))
+
+    def step_failed(self, step: PipelineStep, error: str) -> None:
+        self._store.mark_step_failed(self._run_id, _step_key(step), error)
 
 
 _DRAFT_EDIT_FIELDS = {"to", "subject", "body_text", "body_html"}
