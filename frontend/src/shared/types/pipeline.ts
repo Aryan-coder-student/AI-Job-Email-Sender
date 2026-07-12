@@ -131,6 +131,13 @@ export interface EmailDraft {
 
 export type EmailDraftMap = Record<string, EmailDraft>;
 
+export type DraftUpdatePayload = Pick<
+  EmailDraft,
+  "to" | "subject" | "body_text" | "body_html"
+> & {
+  company_name?: string;
+};
+
 export interface MailQueueResult {
   draft_id: string;
   to?: string | null;

@@ -176,7 +176,7 @@ function DraftEditor({ runId, companyName, draft }: { runId: string, companyName
   }, [draft]);
 
   const updateDraft = useMutation({
-    mutationFn: () => api.updateDraft(runId, companyName, { to, subject, body_text: bodyText }),
+    mutationFn: () => api.updateDraft(runId, { company_name: companyName, to, subject, body_text: bodyText }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["artifact", runId, "drafts"] });
     },

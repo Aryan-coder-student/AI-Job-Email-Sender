@@ -22,6 +22,7 @@ export const newRunSchema = z.object({
 });
 
 export const draftUpdateSchema = z.object({
+  company_name: z.string().optional(),
   to: z.string().email(),
   subject: z.string().min(1),
   body_text: z.string().min(1),

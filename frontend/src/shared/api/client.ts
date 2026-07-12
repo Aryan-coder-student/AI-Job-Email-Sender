@@ -12,6 +12,7 @@ import type {
   ArtifactType,
   CompanyImportPreview,
   CompanyRecord,
+  DraftUpdatePayload,
   EmailDraft,
   EmailDraftMap,
   MailQueueResult,
@@ -160,13 +161,13 @@ export const api = {
   },
   async updateDraft(
     runId: string,
-    companyName: string,
-    draft: Pick<EmailDraft, "to" | "subject" | "body_text" | "body_html">,
+    draft: DraftUpdatePayload,
   ): Promise<EmailDraftMap> {
+    const companyName = draft.company_name ?? mockDraft.company_name;
     if (useMocks) return { [companyName]: { ...mockDraft, company_name: companyName, ...draft } };
     return request<EmailDraftMap>(`/runs/${runId}/drafts`, {
       method: "PUT",
-      body: JSON.stringify({ company_name: companyName, ...draft }),
+      body: JSON.stringify(draft),
     });
   },
   async enqueueDraft(runId: string): Promise<EmailDraftMap> {
