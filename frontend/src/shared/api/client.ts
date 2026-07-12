@@ -37,6 +37,18 @@ export class ApiError extends Error {
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 const useMocks = import.meta.env.VITE_USE_MOCKS === "true";
 
+export function createRunEventSource(runId: string): EventSource | null {
+  if (useMocks || typeof EventSource === "undefined") {
+    return null;
+  }
+
+  try {
+    return new EventSource(`${apiBaseUrl}/runs/${encodeURIComponent(runId)}/events`);
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     headers: init?.body instanceof FormData ? undefined : { "Content-Type": "application/json" },

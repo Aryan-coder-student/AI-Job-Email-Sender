@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { ArtifactPanel } from "@/features/runs/artifact-panel";
+import { useRunEvents } from "@/features/runs/hooks";
 import { PipelineStepper } from "@/features/runs/pipeline-stepper";
+import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -12,37 +14,43 @@ import type { ArtifactType } from "@/shared/types/pipeline";
 
 export function RunDetailPage() {
   const params = useParams();
-  const runId = params.runId ?? "local-demo";
+  const runId = params.runId;
   const [artifactType, setArtifactType] = useState<ArtifactType>("resume");
   const queryClient = useQueryClient();
+  useRunEvents(runId);
   const { data: run, isLoading } = useQuery({
     queryKey: ["run", runId],
-    queryFn: () => api.getRun(runId),
+    queryFn: () => api.getRun(runId as string),
+    enabled: Boolean(runId),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === "created" || status === "running" ? 1500 : false;
     },
   });
   const retry = useMutation({
-    mutationFn: () => api.retryRun(runId),
+    mutationFn: () => api.retryRun(runId as string),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["run", runId] }),
   });
   const resume = useMutation({
-    mutationFn: () => api.resumeRun(runId),
+    mutationFn: () => api.resumeRun(runId as string),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["run", runId] }),
   });
 
   const { data: matchesData } = useQuery({
     queryKey: ["artifact", runId, "matches"],
-    queryFn: () => api.artifact<Record<string, unknown[]>>(runId, "matches"),
+    queryFn: () => api.artifact<Record<string, unknown[]>>(runId as string, "matches"),
     enabled: run?.status === "completed" || run?.steps?.some((s) => s.key === "rank_projects" && s.status === "completed"),
   });
 
   const { data: draftsData } = useQuery({
     queryKey: ["artifact", runId, "drafts"],
-    queryFn: () => api.artifact<Record<string, Record<string, unknown>>>(runId, "drafts"),
+    queryFn: () => api.artifact<Record<string, Record<string, unknown>>>(runId as string, "drafts"),
     enabled: run?.status === "completed" || run?.steps?.some((s) => s.key === "generate_draft" && s.status === "completed"),
   });
+
+  if (!runId) {
+    return <NoSelectedRunState />;
+  }
 
   if (isLoading || !run) {
     return <p className="text-sm text-muted-foreground">Loading run...</p>;

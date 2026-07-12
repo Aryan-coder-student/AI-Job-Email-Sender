@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useActiveRun } from "@/features/runs/hooks";
+import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -11,10 +12,12 @@ import { Input } from "@/shared/ui/form";
 
 export function CompaniesPage() {
   const [query, setQuery] = useState("");
-  const { runId } = useActiveRun();
+  const activeRun = useActiveRun();
+  const { runId } = activeRun;
   const { data: companies = [], isLoading } = useQuery({
     queryKey: ["companies", runId],
-    queryFn: () => api.companies(runId),
+    queryFn: () => api.companies(runId as string),
+    enabled: Boolean(runId),
   });
   const filteredCompanies = useMemo(
     () =>
@@ -23,6 +26,10 @@ export function CompaniesPage() {
       ),
     [companies, query],
   );
+
+  if (!runId) {
+    return <NoSelectedRunState missing={activeRun.isSelectedRunMissing} />;
+  }
 
   return (
     <div className="grid gap-4">

@@ -3,21 +3,28 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import { useActiveRun } from "@/features/runs/hooks";
+import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { ProgressScore } from "@/shared/ui/progress-score";
 import type { MatchResult } from "@/shared/types/pipeline";
 
 export function MatchesPage() {
-  const { runId } = useActiveRun();
+  const activeRun = useActiveRun();
+  const { runId } = activeRun;
   const { data: matchesData, isLoading } = useQuery({
     queryKey: ["artifact", runId, "matches"],
-    queryFn: () => api.artifact<Record<string, MatchResult[]>>(runId, "matches"),
+    queryFn: () => api.artifact<Record<string, MatchResult[]>>(runId as string, "matches"),
+    enabled: Boolean(runId),
   });
 
   const entries = matchesData && typeof matchesData === "object" && !Array.isArray(matchesData)
     ? Object.entries(matchesData)
     : [];
+
+  if (!runId) {
+    return <NoSelectedRunState missing={activeRun.isSelectedRunMissing} />;
+  }
 
   return (
     <div className="grid gap-4">

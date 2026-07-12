@@ -15,6 +15,7 @@ import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
+import { RunPicker } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
 import { Badge } from "@/shared/ui/badge";
@@ -86,8 +87,8 @@ export function AppLayout() {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur">
-            <div className="flex items-center gap-2">
+          <header className="sticky top-0 z-30 flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
+            <div className="flex min-w-0 items-center gap-2">
               <Button
                 aria-label="Open navigation"
                 className="lg:hidden"
@@ -102,15 +103,18 @@ export function AppLayout() {
               </Badge>
               <Badge tone={status?.dry_run_available ? "blue" : "neutral"}>dry run</Badge>
             </div>
-            <a
-              className="hidden items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground sm:flex"
-              href="https://github.com"
-              rel="noreferrer"
-              target="_blank"
-            >
-              <Github className="h-4 w-4" />
-              Source
-            </a>
+            <div className="flex min-w-0 items-center gap-3">
+              <RunPicker />
+              <a
+                className="hidden items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground sm:flex"
+                href="https://github.com"
+                rel="noreferrer"
+                target="_blank"
+              >
+                <Github className="h-4 w-4" />
+                Source
+              </a>
+            </div>
           </header>
 
           <main className="mx-auto w-full max-w-[1280px] p-4 lg:p-6">

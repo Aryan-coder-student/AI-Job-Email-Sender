@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 import { useActiveRun } from "@/features/runs/hooks";
+import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -11,24 +12,30 @@ import { Field, Input, Textarea } from "@/shared/ui/form";
 import type { DraftUpdatePayload, EmailDraft, EmailDraftMap } from "@/shared/types/pipeline";
 
 export function DraftPage() {
-  const { runId } = useActiveRun();
+  const activeRun = useActiveRun();
+  const { runId } = activeRun;
   const queryClient = useQueryClient();
   const { data: drafts } = useQuery({
     queryKey: ["artifact", runId, "drafts"],
-    queryFn: () => api.artifact<EmailDraftMap>(runId, "drafts"),
+    queryFn: () => api.artifact<EmailDraftMap>(runId as string, "drafts"),
+    enabled: Boolean(runId),
   });
   const updateDraft = useMutation({
-    mutationFn: (payload: DraftUpdatePayload) => api.updateDraft(runId, payload),
+    mutationFn: (payload: DraftUpdatePayload) => api.updateDraft(runId as string, payload),
     onSuccess: (updatedDrafts) => {
       queryClient.setQueryData(["artifact", runId, "drafts"], updatedDrafts);
     },
   });
   const enqueueDraft = useMutation({
-    mutationFn: () => api.enqueueDraft(runId),
+    mutationFn: () => api.enqueueDraft(runId as string),
     onSuccess: (updatedDrafts) => {
       queryClient.setQueryData(["artifact", runId, "drafts"], updatedDrafts);
     },
   });
+
+  if (!runId) {
+    return <NoSelectedRunState missing={activeRun.isSelectedRunMissing} />;
+  }
 
   if (!drafts || typeof drafts !== "object") {
     return <p className="text-sm text-muted-foreground">Loading drafts...</p>;

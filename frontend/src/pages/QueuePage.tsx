@@ -3,6 +3,7 @@ import { PlayCircle } from "lucide-react";
 import { useState } from "react";
 
 import { useActiveRun } from "@/features/runs/hooks";
+import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -11,22 +12,28 @@ import { Field, Input } from "@/shared/ui/form";
 import type { MailQueueResult } from "@/shared/types/pipeline";
 
 export function QueuePage() {
-  const { runId } = useActiveRun();
+  const activeRun = useActiveRun();
+  const { runId } = activeRun;
   const queryClient = useQueryClient();
   const [dryRun, setDryRun] = useState(true);
   const [limit, setLimit] = useState("10");
   const processLimit = Math.min(Math.max(Number(limit) || 1, 1), 100);
   const { data: mail = [] } = useQuery({
     queryKey: ["artifact", runId, "mail"],
-    queryFn: () => api.artifact<MailQueueResult[]>(runId, "mail"),
+    queryFn: () => api.artifact<MailQueueResult[]>(runId as string, "mail"),
+    enabled: Boolean(runId),
   });
   const processMail = useMutation({
-    mutationFn: () => api.processMail(runId, { dry_run: dryRun, limit: processLimit }),
+    mutationFn: () => api.processMail(runId as string, { dry_run: dryRun, limit: processLimit }),
     onSuccess: (rows) => {
       queryClient.setQueryData(["artifact", runId, "mail"], rows);
     },
   });
   const rows = processMail.data ?? mail;
+
+  if (!runId) {
+    return <NoSelectedRunState missing={activeRun.isSelectedRunMissing} />;
+  }
 
   return (
     <div className="grid gap-4">
