@@ -39,12 +39,16 @@ class PipelineStepObserver(Protocol):
 
     def step_completed(self, step: PipelineStep) -> None: ...
 
+    def step_failed(self, step: PipelineStep, error: str) -> None: ...
 
 class _NoopStepObserver:
     def step_started(self, step: PipelineStep) -> None:
         pass
 
     def step_completed(self, step: PipelineStep) -> None:
+        pass
+
+    def step_failed(self, step: PipelineStep, error: str) -> None:
         pass
 
 
@@ -124,9 +128,11 @@ class ApplicationPipeline:
             observer.step_started(step)
             handler.execute(self._context, self._options)
             observer.step_completed(step)
-        except PipelineStepError:
+        except PipelineStepError as error:
+            observer.step_failed(step, str(error))
             raise
         except Exception as error:
+            observer.step_failed(step, str(error))
             raise PipelineStepError(f"Step {step.name} failed: {error}") from error
 
         return step.value

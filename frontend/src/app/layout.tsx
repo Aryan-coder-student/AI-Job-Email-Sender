@@ -41,7 +41,7 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex">
+      <div className="flex min-h-screen">
         <aside
           className={cn(
             "fixed inset-y-0 left-0 z-40 w-64 border-r border-border bg-card transition-transform lg:static lg:translate-x-0",

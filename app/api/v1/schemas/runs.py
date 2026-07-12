@@ -8,6 +8,7 @@ class ResumeRunRequest(BaseModel):
 
 
 class DraftUpdateRequest(BaseModel):
+    company_name: str | None = None
     to: str | None = None
     subject: str | None = None
     body_text: str | None = None

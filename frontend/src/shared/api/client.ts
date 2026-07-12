@@ -172,12 +172,13 @@ export const api = {
   },
   async updateDraft(
     runId: string,
+    companyName: string,
     draft: Pick<EmailDraft, "to" | "subject" | "body_text" | "body_html">,
   ): Promise<EmailDraftMap> {
-    if (useMocks) return { [mockDraft.company_name]: { ...mockDraft, ...draft } };
+    if (useMocks) return { [companyName]: { ...mockDraft, company_name: companyName, ...draft } };
     return request<EmailDraftMap>(`/runs/${runId}/drafts`, {
       method: "PUT",
-      body: JSON.stringify(draft),
+      body: JSON.stringify({ company_name: companyName, ...draft }),
     });
   },
   async enqueueDraft(runId: string): Promise<EmailDraftMap> {
