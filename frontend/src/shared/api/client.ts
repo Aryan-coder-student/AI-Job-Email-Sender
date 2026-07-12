@@ -163,7 +163,8 @@ export const api = {
     runId: string,
     draft: DraftUpdatePayload,
   ): Promise<EmailDraftMap> {
-    if (useMocks) return { [mockDraft.company_name]: { ...mockDraft, ...draft } };
+    const companyName = draft.company_name ?? mockDraft.company_name;
+    if (useMocks) return { [companyName]: { ...mockDraft, company_name: companyName, ...draft } };
     return request<EmailDraftMap>(`/runs/${runId}/drafts`, {
       method: "PUT",
       body: JSON.stringify(draft),
