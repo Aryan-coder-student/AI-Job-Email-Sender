@@ -1,17 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { useActiveRun } from "@/features/runs/hooks";
+import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import type { ParsedResume } from "@/shared/types/pipeline";
 
 export function CandidatePage() {
-  const { runId } = useActiveRun();
+  const activeRun = useActiveRun();
+  const { runId } = activeRun;
   const { data: resume, isLoading } = useQuery({
     queryKey: ["artifact", runId, "resume"],
-    queryFn: () => api.artifact<ParsedResume>(runId, "resume"),
+    queryFn: () => api.artifact<ParsedResume>(runId as string, "resume"),
+    enabled: Boolean(runId),
   });
+
+  if (!runId) {
+    return <NoSelectedRunState missing={activeRun.isSelectedRunMissing} />;
+  }
 
   if (isLoading || !resume) {
     return <p className="text-sm text-muted-foreground">Loading candidate profile...</p>;

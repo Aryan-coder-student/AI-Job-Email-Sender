@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, ExternalLink, Save } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 
 import { useActiveRun } from "@/features/runs/hooks";
+import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -12,19 +13,22 @@ import type { CompanyRecord, MatchResult, EmailDraft } from "@/shared/types/pipe
 
 export function CompaniesPage() {
   const [query, setQuery] = useState("");
-  const { runId } = useActiveRun();
-  
+  const activeRun = useActiveRun();
+  const { runId } = activeRun;
   const { data: companies = [], isLoading: isLoadingCompanies } = useQuery({
     queryKey: ["companies", runId],
-    queryFn: () => api.companies(runId),
+    queryFn: () => api.companies(runId as string),
+    enabled: Boolean(runId),
   });
   const { data: matchesData, isLoading: isLoadingMatches } = useQuery({
     queryKey: ["artifact", runId, "matches"],
-    queryFn: () => api.artifact<Record<string, MatchResult[]>>(runId, "matches"),
+    queryFn: () => api.artifact<Record<string, MatchResult[]>>(runId as string, "matches"),
+    enabled: Boolean(runId),
   });
   const { data: draftsData, isLoading: isLoadingDrafts } = useQuery({
     queryKey: ["artifact", runId, "drafts"],
-    queryFn: () => api.artifact<Record<string, EmailDraft>>(runId, "drafts"),
+    queryFn: () => api.artifact<Record<string, EmailDraft>>(runId as string, "drafts"),
+    enabled: Boolean(runId),
   });
 
   const filteredCompanies = useMemo(
@@ -34,6 +38,10 @@ export function CompaniesPage() {
       ),
     [companies, query],
   );
+
+  if (!runId) {
+    return <NoSelectedRunState missing={activeRun.isSelectedRunMissing} />;
+  }
 
   const isLoading = isLoadingCompanies || isLoadingMatches || isLoadingDrafts;
 

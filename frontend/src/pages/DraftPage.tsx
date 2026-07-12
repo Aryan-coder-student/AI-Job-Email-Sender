@@ -3,22 +3,29 @@ import { ChevronDown, ChevronRight, Send } from "lucide-react";
 import { useState } from "react";
 
 import { useActiveRun } from "@/features/runs/hooks";
+import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import type { EmailDraft } from "@/shared/types/pipeline";
 
 export function DraftPage() {
-  const { runId } = useActiveRun();
+  const activeRun = useActiveRun();
+  const { runId } = activeRun;
   const queryClient = useQueryClient();
   const { data: drafts } = useQuery({
     queryKey: ["artifact", runId, "drafts"],
-    queryFn: () => api.artifact<Record<string, EmailDraft>>(runId, "drafts"),
+    queryFn: () => api.artifact<Record<string, EmailDraft>>(runId as string, "drafts"),
+    enabled: Boolean(runId),
   });
   const enqueueDraft = useMutation({
-    mutationFn: () => api.enqueueDraft(runId),
+    mutationFn: () => api.enqueueDraft(runId as string),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["artifact", runId, "drafts"] }),
   });
+
+  if (!runId) {
+    return <NoSelectedRunState missing={activeRun.isSelectedRunMissing} />;
+  }
 
   if (!drafts || typeof drafts !== "object") {
     return <p className="text-sm text-muted-foreground">Loading drafts...</p>;
@@ -35,7 +42,7 @@ export function DraftPage() {
             {entries.length} draft(s) generated
           </p>
         </div>
-        <Button type="button" onClick={() => enqueueDraft.mutate()}>
+        <Button type="button" disabled={enqueueDraft.isPending} onClick={() => enqueueDraft.mutate()}>
           <Send className="h-4 w-4" />
           Enqueue All
         </Button>

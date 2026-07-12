@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { PlayCircle } from "lucide-react";
 
 import { useActiveRun } from "@/features/runs/hooks";
+import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -9,15 +10,21 @@ import { DataTable, Td, Th } from "@/shared/ui/data-table";
 import type { MailQueueResult } from "@/shared/types/pipeline";
 
 export function QueuePage() {
-  const { runId } = useActiveRun();
+  const activeRun = useActiveRun();
+  const { runId } = activeRun;
   const { data: mail = [] } = useQuery({
     queryKey: ["artifact", runId, "mail"],
-    queryFn: () => api.artifact<MailQueueResult[]>(runId, "mail"),
+    queryFn: () => api.artifact<MailQueueResult[]>(runId as string, "mail"),
+    enabled: Boolean(runId),
   });
   const processMail = useMutation({
-    mutationFn: () => api.processMail(runId, { dry_run: true, limit: 10 }),
+    mutationFn: () => api.processMail(runId as string, { dry_run: true, limit: 10 }),
   });
   const rows = processMail.data ?? mail;
+
+  if (!runId) {
+    return <NoSelectedRunState missing={activeRun.isSelectedRunMissing} />;
+  }
 
   return (
     <div className="grid gap-4">
@@ -26,7 +33,7 @@ export function QueuePage() {
           <h1 className="text-2xl font-semibold">Mail queue</h1>
           <p className="text-sm text-muted-foreground">Inspect queued, sent, failed, and dry-run results.</p>
         </div>
-        <Button onClick={() => processMail.mutate()}>
+        <Button disabled={processMail.isPending} onClick={() => processMail.mutate()}>
           <PlayCircle className="h-4 w-4" />
           Process dry run
         </Button>
