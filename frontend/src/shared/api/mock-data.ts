@@ -1,6 +1,7 @@
 import type {
   CompanyRecord,
   EmailDraft,
+  GraphArtifact,
   MailQueueResult,
   MatchResult,
   ParsedGitHubProfile,
@@ -119,14 +120,39 @@ export const mockMatches: MatchResult[] = [
   {
     project_id: "project:2",
     project_name: "AgroScan_Pro",
-    graph_score: 0,
+    graph_score: 0.34,
     embedding_score: 0.032,
     llm_score: 0.015,
-    final_score: 0.014,
-    explanation: "Limited graph evidence, but shows production ML platform experience.",
-    paths: [],
+    final_score: 0.15,
+    explanation: "Strong project-company overlap across ML operations and domain signals.",
+    paths: [
+      {
+        company_name: "10up",
+        project_name: "AgroScan_Pro",
+        path_labels: ["Company", "LOOKS_FOR", "Capability", "DEMONSTRATES", "Project"],
+        graph_score: 0.34,
+        match_source: "company_capability",
+      },
+    ],
   },
 ];
+
+export const mockGraph: GraphArtifact = {
+  candidate: {
+    nodes_upserted: 24,
+    edges_upserted: 41,
+    metadata: { candidate_id: "candidate:aryan-coder-student" },
+  },
+  companies: {
+    nodes_upserted: 88,
+    edges_upserted: 134,
+    metadata: { company_count: 12 },
+  },
+  vector_index: {
+    projects_indexed: 8,
+    jobs_indexed: 12,
+  },
+};
 
 export const mockDraft: EmailDraft = {
   draft_id: "demo-draft",
@@ -142,7 +168,7 @@ export const mockDraft: EmailDraft = {
 };
 
 export const mockMail: MailQueueResult[] = [
-  { draft_id: "demo-draft", to: "hr@example.com", status: "dry_run" },
+  { draft_id: "demo-draft", to: "hr@example.com", status: "dry_run", provider: "gmail" },
 ];
 
 export const mockCompanies: CompanyRecord[] = [

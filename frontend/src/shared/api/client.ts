@@ -1,5 +1,6 @@
 import {
   mockDraft,
+  mockGraph,
   mockGithub,
   mockMail,
   mockMatches,
@@ -210,7 +211,7 @@ function mockArtifact<T>(artifactType: ArtifactType): T {
   const artifacts: Record<ArtifactType, unknown> = {
     resume: mockResume satisfies ParsedResume,
     github: mockGithub satisfies ParsedGitHubProfile,
-    graph: {},
+    graph: mockGraph,
     matches: mockMatches satisfies MatchResult[],
     drafts: { [mockDraft.company_name]: mockDraft } satisfies EmailDraftMap,
     mail: mockMail satisfies MailQueueResult[],

@@ -114,7 +114,15 @@ export interface MatchResult {
   llm_score: number;
   final_score: number;
   explanation: string;
-  paths: unknown[];
+  paths: MatchPath[];
+}
+
+export interface MatchPath {
+  company_name: string;
+  project_name: string;
+  path_labels: string[];
+  graph_score: number;
+  match_source: string;
 }
 
 export interface EmailDraft {
@@ -142,6 +150,24 @@ export interface MailQueueResult {
   draft_id: string;
   to?: string | null;
   status: string;
+  provider?: string | null;
+  message_id?: string | null;
+  error?: string | null;
+}
+
+export interface GraphBuildArtifact {
+  nodes_upserted: number;
+  edges_upserted: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface GraphArtifact {
+  candidate?: GraphBuildArtifact;
+  companies?: GraphBuildArtifact;
+  vector_index?: {
+    projects_indexed?: number;
+    jobs_indexed?: number;
+  };
 }
 
 export interface CompanyRecord {

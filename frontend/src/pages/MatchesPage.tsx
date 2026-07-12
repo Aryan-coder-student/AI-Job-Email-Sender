@@ -5,9 +5,10 @@ import { useState } from "react";
 import { useActiveRun } from "@/features/runs/hooks";
 import { NoSelectedRunState } from "@/features/runs/run-picker";
 import { api } from "@/shared/api/client";
+import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { ProgressScore } from "@/shared/ui/progress-score";
-import type { MatchResult } from "@/shared/types/pipeline";
+import type { MatchPath, MatchResult } from "@/shared/types/pipeline";
 
 export function MatchesPage() {
   const activeRun = useActiveRun();
@@ -77,7 +78,23 @@ function CompanyMatchSection({ companyName, matches }: { companyName: string; ma
                 <CardTitle>{match.project_name}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4 lg:grid-cols-[1fr_280px]">
-                <p className="text-sm text-muted-foreground">{match.explanation}</p>
+                <div className="grid gap-3">
+                  <p className="text-sm text-muted-foreground">{match.explanation}</p>
+                  {match.paths.length > 0 ? (
+                    <div className="grid gap-2">
+                      {match.paths.map((path, index) => (
+                        <PathRow key={`${match.project_id}-${index}`} path={path} />
+                      ))}
+                    </div>
+                  ) : null}
+                  {showZeroGraphDiagnostics(match) ? (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                      No graph paths were found for this project yet. Common reasons are missing enrichment,
+                      no capability or domain overlap, technology-only overlap that is not scored yet, or
+                      candidate/company/job IDs that did not line up during ranking.
+                    </div>
+                  ) : null}
+                </div>
                 <div className="grid gap-2">
                   <ProgressScore label="Final" value={match.final_score} />
                   <ProgressScore label="Graph" value={match.graph_score} />
@@ -91,4 +108,32 @@ function CompanyMatchSection({ companyName, matches }: { companyName: string; ma
       ) : null}
     </div>
   );
+}
+
+function PathRow({ path }: { path: MatchPath }) {
+  return (
+    <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge tone="blue">{formatMatchSource(path.match_source)}</Badge>
+        <span className="text-xs text-muted-foreground">
+          {path.project_name} {"->"} {path.company_name}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {path.path_labels.map((label, index) => (
+          <Badge key={`${label}-${index}`} tone="neutral">
+            {label}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function showZeroGraphDiagnostics(match: MatchResult) {
+  return match.graph_score === 0 && match.paths.length === 0;
+}
+
+function formatMatchSource(matchSource: string) {
+  return matchSource.split("_").join(" ");
 }

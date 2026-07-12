@@ -1,0 +1,44 @@
+technology_categories:
+  agent_framework:
+    aliases:
+      - LangChain
+      - LangGraph
+      - CrewAI
+      - AutoGen
+  web_backend:
+    aliases:
+      - FastAPI
+      - Django
+      - Flask
+  ml_framework:
+    aliases:
+      - PyTorch
+      - TensorFlow
+      - scikit-learn
+  frontend_framework:
+    aliases:
+      - React
+      - Vue
+      - Angular
+      - Streamlit
+
+capability_categories:
+  workflow_automation:
+    aliases:
+      - Workflow Automation
+      - Multi-LLM Orchestration
+      - Email Automation
+  rag:
+    aliases:
+      - RAG
+      - Retrieval Augmented Generation
+  computer_vision:
+    aliases:
+      - Computer Vision
+      - Image Classification
+      - Object Detection
+  mlops:
+    aliases:
+      - MLOps
+      - Model Deployment
+      - Model Serving
