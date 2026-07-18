@@ -44,7 +44,7 @@ export type ResumeProfile = {
 };
 export type ResumeRecommendation = { item_id: string; section: string; title: string; score: number; matched_keywords: string[]; reason: string };
 export type ResumeDocument = {
-  id: string; company_name: string; role: string; template: "classic" | "compact"; section_order: string[];
+  id: string; company_name: string; role: string; template: "jvs" | "classic" | "compact"; section_order: string[];
   selected_item_ids: string[]; profile: ResumeProfile; recommendations: ResumeRecommendation[]; custom_latex?: string | null;
 };
 
@@ -213,7 +213,7 @@ export const api = {
   async createResumeDocument(payload: { company_name: string; role: string; description: string; source_latex?: string }): Promise<ResumeDocument> {
     return request<ResumeDocument>("/resume-builder/documents", {
       method: "POST",
-      body: JSON.stringify({ job: { company_name: payload.company_name, role: payload.role, description: payload.description }, source_latex: payload.source_latex, recommendation_limit: 10, template: "classic" }),
+      body: JSON.stringify({ job: { company_name: payload.company_name, role: payload.role, description: payload.description }, source_latex: payload.source_latex, recommendation_limit: 10, template: "jvs" }),
     });
   },
   async updateResumeDocument(documentId: string, payload: Partial<Pick<ResumeDocument, "custom_latex" | "template" | "section_order" | "selected_item_ids" | "profile">>): Promise<ResumeDocument> {

@@ -37,14 +37,14 @@ class ResumeBuilderService:
             profile=profile, recommendations=recommendations,
             selected_item_ids=[item.item_id for item in recommendations],
         )
-        if source_latex:
-            selected_projects = [item for item in profile.projects if item.id in document.selected_item_ids]
-            document.custom_latex = self.renderer.tailor_existing(
-                source_latex, company_name=job.company_name, role=job.role,
-                projects=selected_projects,
-                technical_keywords=job.required_skills,
-                nontechnical_keywords=job.keywords,
-            )
+        selected_projects = [item for item in profile.projects if item.id in document.selected_item_ids]
+        base_source = source_latex or self.renderer.render(document)
+        document.custom_latex = self.renderer.tailor_existing(
+            base_source, company_name=job.company_name, role=job.role,
+            projects=selected_projects,
+            technical_keywords=job.required_skills,
+            nontechnical_keywords=job.keywords,
+        )
         return self.repository.save_document(document)
 
     def create_from_pipeline(
@@ -78,7 +78,7 @@ class ResumeBuilderService:
             description=str(company.get("job_description") or company.get("company_description") or ""),
             required_skills=_unique(technical), keywords=_unique(nontechnical),
         )
-        return self.create_document(job, "classic", limit, source_latex)
+        return self.create_document(job, "jvs", limit, source_latex)
 
     def get_document(self, document_id: str) -> ResumeDocument | None:
         return self.repository.get_document(document_id)

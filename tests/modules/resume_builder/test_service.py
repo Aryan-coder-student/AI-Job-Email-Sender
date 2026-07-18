@@ -57,6 +57,15 @@ def test_existing_latex_is_preserved_and_tailored(profile):
     assert tailored.count("RESUME-BUILDER:TAILORED-START") == 1
 
 
+def test_jvs_is_default_self_contained_template(tmp_path, profile):
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path)
+    service.save_profile(profile)
+    document = service.create_document(JobRequirements(company_name="Acme", required_skills=["Python"]), "jvs", 5)
+    assert "JV's Resume Template" in document.custom_latex
+    assert r"\resumeProjectHeading" in document.custom_latex
+    assert r"\input{particulars}" not in document.custom_latex
+
+
 def test_pipeline_uses_ranked_github_projects_and_tags(tmp_path, profile):
     service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path)
     service.save_profile(profile)

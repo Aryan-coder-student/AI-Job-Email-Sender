@@ -54,7 +54,7 @@ class ResumeDocument(BaseModel):
     id: str = Field(default_factory=lambda: uuid4().hex)
     company_name: str
     role: str = ""
-    template: Literal["classic", "compact"] = "classic"
+    template: Literal["jvs", "classic", "compact"] = "jvs"
     section_order: list[str] = Field(
         default_factory=lambda: ["summary", "skills", "experience", "projects", "education", "certifications", "publications"]
     )
@@ -73,7 +73,7 @@ class RecommendationRequest(BaseModel):
 class ResumeDocumentRequest(BaseModel):
     job: JobRequirements
     source_latex: str | None = None
-    template: Literal["classic", "compact"] = "classic"
+    template: Literal["jvs", "classic", "compact"] = "jvs"
     recommendation_limit: int = Field(default=10, ge=5, le=10)
 
 
@@ -85,7 +85,7 @@ class PipelineTailorRequest(BaseModel):
 
 class LatexUpdateRequest(BaseModel):
     custom_latex: str | None = None
-    template: Literal["classic", "compact"] | None = None
+    template: Literal["jvs", "classic", "compact"] | None = None
     section_order: list[str] | None = None
     selected_item_ids: list[str] | None = None
     profile: ProfessionalProfile | None = None

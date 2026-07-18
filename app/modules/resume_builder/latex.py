@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from app.modules.resume_builder.model import ProfileItem, ResumeDocument
+from app.modules.resume_builder.jvs_template import render_jvs_template
 
 LATEX_ESCAPES = {"\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#", "_": r"\_", "{": r"\{", "}": r"\}", "~": r"\textasciitilde{}", "^": r"\textasciicircum{}"}
 FORBIDDEN = re.compile(r"\\(?:write18|input|include|openout|read|usepackage\s*\{shellesc\}|immediate)", re.IGNORECASE)
@@ -20,6 +21,10 @@ class LatexRenderer:
         if document.custom_latex is not None:
             validate_latex(document.custom_latex)
             return document.custom_latex
+        if document.template == "jvs":
+            source = render_jvs_template(document.profile, escape_latex)
+            validate_latex(source)
+            return source
         profile = document.profile
         selected = set(document.selected_item_ids)
         sections = {
@@ -65,20 +70,24 @@ class LatexRenderer:
         validate_latex(source)
         start = "% RESUME-BUILDER:TAILORED-START"
         end = "% RESUME-BUILDER:TAILORED-END"
-        project_lines = [
-            rf"\item \textbf{{{escape_latex(item.title)}}} -- {escape_latex(item.description)}"
-            for item in projects
-        ]
-        parts = [
-            start,
-            rf"\section*{{Target: {escape_latex(company_name)} -- {escape_latex(role)}}}",
-        ]
+        is_jvs = r"\resumeProjectHeading" in source and r"\resumeSubHeadingListStart" in source
+        project_lines = []
+        for item in projects:
+            if is_jvs:
+                tech = ", ".join(item.skills)
+                project_lines.extend([
+                    rf"\resumeProjectHeading{{\textbf{{{escape_latex(item.title)}}} $|$ {escape_latex(tech)}}}{{}}",
+                    r"\resumeItemListStart", rf"\resumeItem{{{escape_latex(item.description)}}}", r"\resumeItemListEnd",
+                ])
+            else:
+                project_lines.append(rf"\item \textbf{{{escape_latex(item.title)}}} -- {escape_latex(item.description)}")
+        parts = [start, rf"\section{{Relevant Projects for {escape_latex(company_name)}}}" if is_jvs else rf"\section*{{Target: {escape_latex(company_name)} -- {escape_latex(role)}}}"]
         if technical_keywords:
             parts.append(rf"\textbf{{Technical keywords:}} {escape_latex(', '.join(technical_keywords))}\\")
         if nontechnical_keywords:
             parts.append(rf"\textbf{{Domain keywords:}} {escape_latex(', '.join(nontechnical_keywords))}")
         if project_lines:
-            parts.extend([r"\subsection*{Most relevant projects}", r"\begin{itemize}", *project_lines, r"\end{itemize}"])
+            parts.extend(([r"\resumeSubHeadingListStart", *project_lines, r"\resumeSubHeadingListEnd"] if is_jvs else [r"\subsection*{Most relevant projects}", r"\begin{itemize}", *project_lines, r"\end{itemize}"]))
         parts.append(end)
         block = "\n".join(parts)
         managed = re.compile(re.escape(start) + r".*?" + re.escape(end), re.DOTALL)
