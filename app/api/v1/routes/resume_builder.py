@@ -105,7 +105,7 @@ def export_pdf(document_id: str, service: ResumeBuilderService = Depends(get_ser
     return Response(
         content,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="resume-{document_id}.pdf"'},
+        headers={"Content-Disposition": f'inline; filename="resume-{document_id}.pdf"'},
     )
 
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Download, FileCode2, Sparkles } from "lucide-react";
+import { Download, FileCode2, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { api, type ResumeDocument } from "@/shared/api/client";
@@ -14,17 +14,22 @@ export function ResumeBuilderPage() {
   const [description, setDescription] = useState("");
   const [document, setDocument] = useState<ResumeDocument | null>(null);
   const [source, setSource] = useState("");
+  const [previewVersion, setPreviewVersion] = useState(0);
 
   const create = useMutation({
     mutationFn: api.createResumeDocument,
     onSuccess: async (value) => {
       setDocument(value);
       setSource(await fetch(api.resumeExportUrl(value.id, "source")).then((response) => response.text()));
+      setPreviewVersion((version) => version + 1);
     },
   });
   const save = useMutation({
     mutationFn: () => api.updateResumeDocument(document!.id, { custom_latex: source }),
-    onSuccess: setDocument,
+    onSuccess: (value) => {
+      setDocument(value);
+      setPreviewVersion((version) => version + 1);
+    },
   });
 
   useEffect(() => { if (document?.custom_latex) setSource(document.custom_latex); }, [document]);
@@ -69,11 +74,36 @@ export function ResumeBuilderPage() {
           </Card> : null}
         </div>
         <Card className="min-w-0">
-          <CardHeader><CardTitle>LaTeX editor</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Editor and live output</CardTitle></CardHeader>
           <CardContent className="grid gap-3">
-            <Textarea className="min-h-[560px] font-mono text-xs" disabled={!document} value={source} onChange={(e) => setSource(e.target.value)} placeholder="Generate a resume to begin editing." />
+            <div className="grid gap-3 xl:grid-cols-2">
+              <div className="grid content-start gap-2">
+                <span className="text-sm font-semibold">Editable LaTeX</span>
+                <Textarea className="min-h-[620px] font-mono text-xs" disabled={!document} value={source} onChange={(e) => setSource(e.target.value)} placeholder="Generate a resume to begin editing." />
+              </div>
+              <div className="grid content-start gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Compiled résumé</span>
+                  <Button size="sm" variant="ghost" disabled={!document} onClick={() => setPreviewVersion((version) => version + 1)}>
+                    <RefreshCw className="h-4 w-4" />Refresh
+                  </Button>
+                </div>
+                {document ? (
+                  <iframe
+                    key={previewVersion}
+                    title="Compiled resume preview"
+                    className="h-[620px] w-full rounded-md border border-border bg-white"
+                    src={`${api.resumeExportUrl(document.id, "pdf")}?v=${previewVersion}`}
+                  />
+                ) : (
+                  <div className="grid h-[620px] place-items-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
+                    The compiled PDF will appear here.
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
-              <Button disabled={!document || save.isPending} onClick={() => save.mutate()}><FileCode2 className="mr-2 h-4 w-4" />Save & validate</Button>
+              <Button disabled={!document || save.isPending} onClick={() => save.mutate()}><FileCode2 className="mr-2 h-4 w-4" />Save, validate & preview</Button>
               {document ? <>
                 <Button asChild variant="outline"><a href={api.resumeExportUrl(document.id, "source")}><Download className="mr-2 h-4 w-4" />LaTeX</a></Button>
                 <Button asChild variant="outline"><a href={api.resumeExportUrl(document.id, "pdf")}><Download className="mr-2 h-4 w-4" />PDF</a></Button>
