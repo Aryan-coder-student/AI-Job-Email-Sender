@@ -46,6 +46,31 @@ def test_custom_latex_rejects_shell_and_file_commands():
         validate_latex(r"\documentclass{article}\begin{document}\input{/etc/passwd}\end{document}")
 
 
+def test_existing_latex_is_preserved_and_tailored(profile):
+    source = r"\documentclass{article}\begin{document}\section*{Original}Keep this\end{document}"
+    tailored = LatexRenderer().tailor_existing(
+        source, company_name="Acme", role="Backend Engineer", projects=profile.projects,
+        technical_keywords=["Python", "FastAPI"], nontechnical_keywords=["recruitment"],
+    )
+    assert r"\section*{Original}Keep this" in tailored
+    assert "Acme" in tailored and "Crawler" in tailored
+    assert tailored.count("RESUME-BUILDER:TAILORED-START") == 1
+
+
+def test_pipeline_uses_ranked_github_projects_and_tags(tmp_path, profile):
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path)
+    service.save_profile(profile)
+    document = service.create_from_pipeline(
+        source_latex=r"\documentclass{article}\begin{document}Base\end{document}",
+        company={"company_name": "Acme", "role": "AI Engineer", "job_description": "Build APIs"},
+        github={"projects": [{"repo_name": "Crawler", "summary": "Crawls job UIs", "repo_link": "https://github/x", "tech_stack": {"backend": ["Python"], "frontend": [], "ai_ml": ["LLM"]}, "non_tech_tags": ["recruitment"]}]},
+        matches=[{"project_name": "Crawler", "final_score": 0.9}], limit=5,
+    )
+    assert "Crawler" in document.custom_latex
+    assert "Python" in document.custom_latex
+    assert "recruitment" in document.custom_latex
+
+
 def test_service_persists_profile_and_document(tmp_path, profile):
     repository = JsonResumeBuilderRepository(tmp_path)
     service = ResumeBuilderService(repository, StubCompiler(), tmp_path / "compiled")

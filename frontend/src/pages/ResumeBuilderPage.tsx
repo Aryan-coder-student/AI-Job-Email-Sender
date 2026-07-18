@@ -45,7 +45,10 @@ export function ResumeBuilderPage() {
               <Field label="Company"><Input value={company} onChange={(e) => setCompany(e.target.value)} /></Field>
               <Field label="Role"><Input value={role} onChange={(e) => setRole(e.target.value)} /></Field>
               <Field label="Job description"><Textarea className="min-h-44" value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
-              <Button disabled={!company || create.isPending} onClick={() => create.mutate({ company_name: company, role, description })}>
+              <Field label="Existing LaTeX resume" hint="Paste the complete generated .tex source. Its formatting is preserved.">
+                <Textarea className="min-h-44 font-mono text-xs" value={source} onChange={(e) => setSource(e.target.value)} placeholder="\\documentclass{...} ..." />
+              </Field>
+              <Button disabled={!company || !source.includes("\\begin{document}") || create.isPending} onClick={() => create.mutate({ company_name: company, role, description, source_latex: source })}>
                 <Sparkles className="mr-2 h-4 w-4" />{create.isPending ? "Matching…" : "Build tailored resume"}
               </Button>
             </CardContent>

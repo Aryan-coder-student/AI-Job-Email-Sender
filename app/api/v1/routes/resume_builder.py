@@ -9,6 +9,7 @@ from app.modules.resume_builder import ResumeBuilderService, build_resume_builde
 from app.modules.resume_builder.model import (
     LatexUpdateRequest,
     ProfessionalProfile,
+    PipelineTailorRequest,
     RecommendationRequest,
     ResumeDocumentRequest,
 )
@@ -49,7 +50,25 @@ def recommend(payload: RecommendationRequest, service: ResumeBuilderService = De
 
 @router.post("/documents")
 def create_document(payload: ResumeDocumentRequest, service: ResumeBuilderService = Depends(get_service)):
-    return service.create_document(payload.job, payload.template, payload.recommendation_limit)
+    return service.create_document(payload.job, payload.template, payload.recommendation_limit, payload.source_latex)
+
+
+@router.post("/documents/from-run/{run_id}")
+def create_document_from_run(run_id: str, payload: PipelineTailorRequest, service: ResumeBuilderService = Depends(get_service)):
+    from app.api.v1.services.run_store import get_run_store
+
+    store = get_run_store()
+    github = store.get_artifact(run_id, "github")
+    matches_artifact = store.get_artifact(run_id, "matches")
+    companies = store.get_companies(run_id)
+    company = next((item for item in companies or [] if str(item.get("company_name")) == payload.company_name), None)
+    if not isinstance(github, dict) or company is None or not isinstance(matches_artifact, (dict, list)):
+        raise HTTPException(status_code=404, detail="GitHub, company, or match artifact is missing for this run.")
+    matches = matches_artifact.get(payload.company_name, []) if isinstance(matches_artifact, dict) else matches_artifact
+    return service.create_from_pipeline(
+        source_latex=payload.source_latex, company=company, github=github,
+        matches=matches if isinstance(matches, list) else [], limit=payload.recommendation_limit,
+    )
 
 
 @router.get("/documents/{document_id}")

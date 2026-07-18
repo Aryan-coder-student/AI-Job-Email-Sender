@@ -72,7 +72,14 @@ class RecommendationRequest(BaseModel):
 
 class ResumeDocumentRequest(BaseModel):
     job: JobRequirements
+    source_latex: str | None = None
     template: Literal["classic", "compact"] = "classic"
+    recommendation_limit: int = Field(default=10, ge=5, le=10)
+
+
+class PipelineTailorRequest(BaseModel):
+    company_name: str
+    source_latex: str
     recommendation_limit: int = Field(default=10, ge=5, le=10)
 
 

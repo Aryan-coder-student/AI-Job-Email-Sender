@@ -51,6 +51,41 @@ class LatexRenderer:
         validate_latex(source)
         return source
 
+    def tailor_existing(
+        self,
+        source: str,
+        *,
+        company_name: str,
+        role: str,
+        projects: list[ProfileItem],
+        technical_keywords: list[str],
+        nontechnical_keywords: list[str],
+    ) -> str:
+        """Preserve the supplied template and replace only the managed tailoring block."""
+        validate_latex(source)
+        start = "% RESUME-BUILDER:TAILORED-START"
+        end = "% RESUME-BUILDER:TAILORED-END"
+        project_lines = [
+            rf"\item \textbf{{{escape_latex(item.title)}}} -- {escape_latex(item.description)}"
+            for item in projects
+        ]
+        parts = [
+            start,
+            rf"\section*{{Target: {escape_latex(company_name)} -- {escape_latex(role)}}}",
+        ]
+        if technical_keywords:
+            parts.append(rf"\textbf{{Technical keywords:}} {escape_latex(', '.join(technical_keywords))}\\")
+        if nontechnical_keywords:
+            parts.append(rf"\textbf{{Domain keywords:}} {escape_latex(', '.join(nontechnical_keywords))}")
+        if project_lines:
+            parts.extend([r"\subsection*{Most relevant projects}", r"\begin{itemize}", *project_lines, r"\end{itemize}"])
+        parts.append(end)
+        block = "\n".join(parts)
+        managed = re.compile(re.escape(start) + r".*?" + re.escape(end), re.DOTALL)
+        tailored = managed.sub(lambda _: block, source) if managed.search(source) else source.replace(r"\end{document}", block + "\n" + r"\end{document}")
+        validate_latex(tailored)
+        return tailored
+
     @staticmethod
     def _text_section(title: str, value: str) -> str:
         return f"\\section*{{{title}}}\n{escape_latex(value)}" if value.strip() else ""

@@ -29,7 +29,7 @@ class ResumeBuilderService:
     def recommend(self, job: JobRequirements, limit: int = 10):
         return self.matcher.recommend(self.get_profile(), job, limit)
 
-    def create_document(self, job: JobRequirements, template: str, limit: int) -> ResumeDocument:
+    def create_document(self, job: JobRequirements, template: str, limit: int, source_latex: str | None = None) -> ResumeDocument:
         profile = self.get_profile()
         recommendations = self.matcher.recommend(profile, job, limit)
         document = ResumeDocument(
@@ -37,7 +37,48 @@ class ResumeBuilderService:
             profile=profile, recommendations=recommendations,
             selected_item_ids=[item.item_id for item in recommendations],
         )
+        if source_latex:
+            selected_projects = [item for item in profile.projects if item.id in document.selected_item_ids]
+            document.custom_latex = self.renderer.tailor_existing(
+                source_latex, company_name=job.company_name, role=job.role,
+                projects=selected_projects,
+                technical_keywords=job.required_skills,
+                nontechnical_keywords=job.keywords,
+            )
         return self.repository.save_document(document)
+
+    def create_from_pipeline(
+        self,
+        *,
+        source_latex: str,
+        company: dict,
+        github: dict,
+        matches: list[dict],
+        limit: int,
+    ) -> ResumeDocument:
+        matched_names = [str(item.get("project_name") or "") for item in matches[:limit]]
+        projects_by_name = {str(item.get("repo_name") or "").lower(): item for item in github.get("projects") or []}
+        projects: list[ProfileItem] = []
+        technical: list[str] = []
+        nontechnical: list[str] = []
+        for name in matched_names:
+            item = projects_by_name.get(name.lower())
+            if not item:
+                continue
+            stack = item.get("tech_stack") or {}
+            tech = [str(value) for group in ("backend", "frontend", "ai_ml") for value in stack.get(group) or []]
+            tags = [str(value) for value in item.get("non_tech_tags") or []]
+            technical.extend(tech)
+            nontechnical.extend(tags)
+            projects.append(ProfileItem(title=name, description=str(item.get("summary") or ""), skills=tech, link=item.get("repo_link")))
+        profile = self.get_profile().model_copy(update={"projects": projects or self.get_profile().projects})
+        self.save_profile(profile)
+        job = JobRequirements(
+            company_name=str(company.get("company_name") or ""), role=str(company.get("role") or ""),
+            description=str(company.get("job_description") or company.get("company_description") or ""),
+            required_skills=_unique(technical), keywords=_unique(nontechnical),
+        )
+        return self.create_document(job, "classic", limit, source_latex)
 
     def get_document(self, document_id: str) -> ResumeDocument | None:
         return self.repository.get_document(document_id)
@@ -77,3 +118,7 @@ def profile_from_pipeline_artifact(payload: dict) -> ProfessionalProfile:
         certifications=[ProfileItem(title=str(item.get("name") or "Certification"), link=item.get("link")) for item in payload.get("certifications") or []],
         publications=[ProfileItem(title="Publication", description=str(item)) for item in payload.get("research") or []],
     )
+
+
+def _unique(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(value.strip() for value in values if value.strip()))
