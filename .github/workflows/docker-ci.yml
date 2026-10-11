@@ -55,6 +55,10 @@ jobs:
           context: .
           file: Dockerfile
           push: false
+      - name: Smoke test backend image imports
+        run: |
+          docker build -t job-send-backend:ci .
+          docker run --rm job-send-backend:ci python -c "from app.api.main import app; assert app is not None"
       - name: Build frontend image
         uses: docker/build-push-action@v6
         with:
