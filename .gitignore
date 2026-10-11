@@ -244,3 +244,7 @@ parse_resume.json
 .streamlit/secrets.toml
 sample
 data/
+
+# Keep the graph ontology configuration tracked despite the generic data/ ignore.
+!app/modules/graph/data/
+!app/modules/graph/data/ontology.yaml

@@ -1,0 +1,36 @@
+# Canonical graph taxonomy. Each alias is matched case-insensitively.
+technology_categories:
+  agent_framework:
+    aliases:
+      - LangChain
+      - LangGraph
+      - LlamaIndex
+  backend_framework:
+    aliases:
+      - FastAPI
+      - Django
+      - Flask
+  programming_language:
+    aliases:
+      - Python
+      - TypeScript
+      - JavaScript
+  frontend_framework:
+    aliases:
+      - React
+      - Vue
+      - Angular
+
+capability_categories:
+  rag:
+    aliases:
+      - RAG
+      - Retrieval Augmented Generation
+      - Retrieval-Augmented Generation
+  workflow_automation:
+    aliases:
+      - Workflow Automation
+  natural_language_processing:
+    aliases:
+      - NLP
+      - Natural Language Processing
