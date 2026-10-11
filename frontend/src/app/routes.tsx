@@ -9,6 +9,7 @@ import { MatchesPage } from "@/pages/MatchesPage";
 import { NewRunPage } from "@/pages/NewRunPage";
 import { QueuePage } from "@/pages/QueuePage";
 import { RunDetailPage } from "@/pages/RunDetailPage";
+import { ResumeBuilderPage } from "@/pages/ResumeBuilderPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 
 export const router = createBrowserRouter([
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: "runs/new", element: <NewRunPage /> },
       { path: "runs/:runId", element: <RunDetailPage /> },
       { path: "candidate", element: <CandidatePage /> },
+      { path: "resume-builder", element: <ResumeBuilderPage /> },
       { path: "companies", element: <CompaniesPage /> },
       { path: "matches", element: <MatchesPage /> },
       { path: "drafts", element: <DraftPage /> },
