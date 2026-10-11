@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Run backend unit tests
-        run: python -m pytest tests -q
+        run: python -m pytest tests -q --import-mode=importlib
 
   frontend-tests:
     runs-on: ubuntu-latest
