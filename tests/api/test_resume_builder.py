@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.api.v1.routes.resume_builder import get_service, router
 from app.modules.resume_builder.repository import JsonResumeBuilderRepository
 from app.modules.resume_builder.service import ResumeBuilderService
+from tests.modules.resume_builder.test_company_batch import StubLLM
 
 
 class StubCompiler:
@@ -18,7 +19,7 @@ def test_resume_builder_flow(tmp_path):
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
     app.dependency_overrides[get_service] = lambda: ResumeBuilderService(
-        JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled"
+        JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled", llm_router=StubLLM()
     )
     client = TestClient(app)
     profile = {
