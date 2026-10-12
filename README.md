@@ -298,7 +298,9 @@ Pipeline outputs are written as JSON artifacts:
 
 ### Company-specific resumes
 
-Every normal pipeline run generates a **separate resume for each company with at least one ranked project match**, immediately after matching and before outreach draft creation. The source candidate profile is not modified. Each company's generated resume is isolated under its run output directory and can be reviewed or edited independently in the **Resume Builder** page by selecting that run.
+Every normal pipeline run generates a **separate resume for each company with at least one ranked project match**, immediately after matching and before outreach draft creation. **The final relevance decision requires an LLM**: it chooses which projects, experiences, and factual skills to feature from the candidate's parsed resume, GitHub evidence, each company's job description, and ranked match signals. No hardcoded keyword scoring or skill dictionary is used in the company-specific resume stage. The source candidate profile is not modified. Each company's generated resume is isolated under its run output directory and can be reviewed or edited independently in the **Resume Builder** page by selecting that run.
+
+Configure at least one of `GROQ_API_KEY_1`–`4`, `OPENAI_API_KEY`, or `GEMINI_API_KEY` to generate company resumes. If the LLM is unavailable or selects a project/skill outside the supplied evidence, generation fails explicitly instead of falling back to keyword stuffing. Verified descriptions and experience facts remain unchanged; the LLM controls relevance, not fact creation. The standalone manual Resume Builder retains its older keyword-based recommendation path; this requirement applies to the automatic matched-company path and `/documents/from-run`.
 
 LaTeX compilation requires `pdflatex`. The backend Docker image from PR #40 installs it; when running the backend directly on your host, install a compatible TeX Live distribution.
 
