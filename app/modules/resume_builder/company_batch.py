@@ -10,8 +10,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from app.modules.llm.factory import build_default_llm_router
 from app.modules.resume_builder.latex import PdfLatexCompiler
-from app.modules.resume_builder.model import JobRequirements, ProfileItem
+from app.modules.resume_builder.llm_tailoring import CompanyResumeTailor
+from app.modules.resume_builder.model import JobRequirements
 from app.modules.resume_builder.repository import JsonResumeBuilderRepository
 from app.modules.resume_builder.service import ResumeBuilderService, profile_from_pipeline_artifact
 
@@ -22,9 +24,10 @@ def company_key(company_name: str) -> str:
 
 
 class CompanyResumeBatch:
-    def __init__(self, output_dir: Path, compiler=None) -> None:
+    def __init__(self, output_dir: Path, compiler=None, llm_router=None) -> None:
         self.output_dir = Path(output_dir)
         self.root = self.output_dir / "company_resumes"
+        self._llm_router = llm_router
         self.service = ResumeBuilderService(
             JsonResumeBuilderRepository(self.root),
             compiler or PdfLatexCompiler(),
@@ -59,54 +62,39 @@ class CompanyResumeBatch:
         if not isinstance(matches, dict):
             raise ValueError("Ranked company matches are required.")
         original_profile = profile_from_pipeline_artifact(resume)
-        available_projects = {
-            str(project.get("repo_name") or "").casefold(): project
-            for project in github.get("projects") or []
-            if isinstance(project, dict)
-        }
+        # Intentionally no regex/keyword overlap fallback: generation requires an
+        # available LLM provider and fails explicitly if the model is unavailable.
+        eligible_companies = [
+            company for company in companies
+            if str(company.get("company_name") or "").strip()
+            and matches.get(str(company.get("company_name") or "").strip())
+        ]
+        if not eligible_companies:
+            raise ValueError("No companies have ranked project matches.")
+        tailor = CompanyResumeTailor(self._llm_router or build_default_llm_router())
         entries: dict[str, dict[str, Any]] = {}
-        for company in companies:
-            name = str(company.get("company_name") or "").strip()
-            ranked = matches.get(name) or []
-            if not name or not ranked:
-                continue
+        for company in eligible_companies:
+            name = str(company["company_name"]).strip()
+            ranked = matches[name]
             if name in entries:
                 raise ValueError(f"Duplicate company name in resume batch: {name}")
-
-            relevant: list[ProfileItem] = []
-            technologies: list[str] = []
-            seen: set[str] = set()
-            for match in ranked[:limit]:
-                project_name = str(match.get("project_name") or "")
-                project = available_projects.get(project_name.casefold())
-                if project is None or project_name.casefold() in seen:
-                    continue
-                seen.add(project_name.casefold())
-                stack = project.get("tech_stack") or {}
-                skills = [
-                    str(technology) for category in ("backend", "frontend", "ai_ml")
-                    for technology in stack.get(category) or []
-                ]
-                technologies.extend(skills)
-                relevant.append(ProfileItem(
-                    title=project_name,
-                    description=str(project.get("summary") or ""),
-                    skills=skills,
-                    link=project.get("repo_link"),
-                ))
-
-            # Each company gets a private snapshot; never save it as the shared profile.
-            scoped_profile = original_profile.model_copy(deep=True)
-            if relevant:
-                scoped_profile.projects = relevant
+            result = tailor.tailor(
+                profile=original_profile,
+                company=company,
+                github=github,
+                matches=ranked,
+                limit=limit,
+            )
             job = JobRequirements(
                 company_name=name,
                 role=str(company.get("role") or ""),
                 description=str(company.get("job_description") or company.get("company_description") or ""),
-                required_skills=list(dict.fromkeys(technologies)),
             )
-            document = self.service.create_document(
-                job, "jvs", max(5, min(limit, 10)), profile=scoped_profile,
+            document = self.service.create_llm_curated_document(
+                job,
+                profile=result.profile,
+                recommendations=result.recommendations,
+                selected_skills=result.selected_skills,
             )
             pdf = self.service.pdf(document)
             if not pdf.startswith(b"%PDF-"):
@@ -117,6 +105,8 @@ class CompanyResumeBatch:
                 "document_id": document.id,
                 "role": job.role,
                 "match_count": len(ranked),
+                "llm_provider": result.provider,
+                "llm_model": result.model,
                 "status": "ready",
             }
 
