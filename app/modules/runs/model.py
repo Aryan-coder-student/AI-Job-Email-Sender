@@ -11,6 +11,7 @@ ARTIFACT_FILES: dict[str, str] = {
     "github": "github_projects_resume.json",
     "graph": "graph_build.json",
     "matches": "matches.json",
+    "company_resumes": "company_resumes.json",
     "drafts": "drafts.json",
     "mail": "mail_queue_result.json",
 }
