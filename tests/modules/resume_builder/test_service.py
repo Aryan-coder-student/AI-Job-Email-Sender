@@ -222,6 +222,6 @@ def test_llm_curated_skills_survive_project_selection_edits(tmp_path):
         document,
         LatexUpdateRequest(selected_item_ids=[], custom_latex=None),
     )
-    assert "API" not in updated.custom_latex
+    assert r"\resumeProjectHeading{\textbf{API}" not in updated.custom_latex
     assert "FastAPI" in updated.custom_latex
     assert service.get_document(document.id).selected_skills == ["FastAPI"]
