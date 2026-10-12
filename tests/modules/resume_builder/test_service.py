@@ -177,7 +177,7 @@ def test_complete_resume_builder_flow(tmp_path):
         "links": {"emails": ["taylor@example.com"], "github": "https://github.com/taylor"},
     }
     imported_profile = profile_from_pipeline_artifact(raw_artifact)
-    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled")
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled", llm_router=StubLLM())
     saved_profile = service.save_profile(imported_profile)
     assert saved_profile.name == "Taylor Swift"
 
