@@ -67,6 +67,8 @@ def update_company_resume(run_id: str, company_key: str, payload: LatexUpdateReq
         updated = batch.service.update_document(document, payload)
         batch.service.pdf(updated)
     except (ValueError, RuntimeError) as error:
+        # A LaTeX source that fails compilation must not replace a valid resume.
+        batch.service.repository.save_document(document)
         raise HTTPException(status_code=422, detail=str(error)) from error
     return updated
 
