@@ -130,6 +130,77 @@ npm run dev
 
 Set `VITE_API_BASE_URL=http://localhost:8000/api/v1` in `frontend/.env.local` when the frontend and backend run on separate ports. For UI-only work, set `VITE_USE_MOCKS=true`.
 
+Open the portal at `http://localhost:5173` when using the Vite development server. If you start the containerized app with `docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build`, open `http://localhost:8080` instead.
+
+## How to Use the Portal
+
+### 1. Check system readiness
+
+Open the portal and use **Dashboard** to confirm that Redis, Neo4j, and Qdrant are available. The status badges also show whether an LLM provider, GitHub token, and mail provider are configured. You can run safely without sending mail by keeping **dry run** enabled.
+
+<p align="center">
+  <img src="doc/assets/portal-guide/01-dashboard.png" alt="Job Send Crawl dashboard showing run, LLM, and service readiness" width="100%" />
+</p>
+
+For endpoint-level details, open **Settings**. Secret values are never displayed; the page only reports masked readiness and configured service endpoints.
+
+<p align="center">
+  <img src="doc/assets/portal-guide/03-settings.png" alt="Job Send Crawl settings page showing LLM provider and service readiness" width="100%" />
+</p>
+
+### 2. Start a new run and import inputs
+
+Select **New Run** in the sidebar, then complete the four wizard stages:
+
+1. **Import:** upload a PDF, DOCX, or text resume. Add companies from an Excel, CSV, or JSON file, or switch to **Google Sheet URL** and paste a shared sheet link. Adjust the header row, sheet names, or row limit when needed, then select **Parse companies**.
+2. **Select:** review the normalized company rows and select one or more valid companies. Rows with validation issues cannot be selected until the source data is fixed.
+3. **Options:** add the recipient email and optional job URL, then choose repository, company, and match limits. Leave **Dry run** checked for the first run. Use **Do not enqueue** if you only want generated artifacts.
+4. **Review:** verify the selected companies and options, then select **Start run**.
+
+<p align="center">
+  <img src="doc/assets/portal-guide/02-new-run.png" alt="Job Send Crawl new-run wizard with resume and company import fields" width="100%" />
+</p>
+
+### 3. Monitor and review the results
+
+After the run starts, the portal opens its run detail page. Follow the step status and logs until the pipeline finishes. The run selector in the top bar lets you switch between previous runs.
+
+<p align="center">
+  <img src="doc/assets/portal-guide/04-run-detail.png" alt="Completed Job Send Crawl run with six pipeline stages, artifact preview, and logs" width="100%" />
+</p>
+
+Use the sidebar workspaces to inspect the generated output:
+
+- **Candidate** and **Resume Builder:** review parsed candidate data and resume content.
+- **Companies:** inspect the selected and normalized company records.
+- **Matches:** compare ranked project-company matches and their scores.
+- **Drafts:** expand each company to review the recipient, subject, and generated email body. Select **Enqueue All** only after reviewing the drafts.
+- **Queue:** inspect queued results and select **Process dry run** to test mail processing without sending real email.
+
+The candidate and company workspaces turn the parsed artifacts into reviewable records before you act on the generated outreach.
+
+<p align="center">
+  <img src="doc/assets/portal-guide/05-candidate.png" alt="Parsed candidate profile with skills, experience, and projects" width="100%" />
+</p>
+
+<p align="center">
+  <img src="doc/assets/portal-guide/06-companies.png" alt="Company dashboard with searchable company records and draft status" width="100%" />
+</p>
+
+Expand a draft to verify its recipient, subject, body, company, and status before enqueueing it.
+
+<p align="center">
+  <img src="doc/assets/portal-guide/07-drafts.png" alt="Expanded generated email draft ready for human review" width="100%" />
+</p>
+
+Finally, confirm that a test result is marked `dry_run` on the queue page. This verifies mail processing without delivering a message.
+
+<p align="center">
+  <img src="doc/assets/portal-guide/08-queue.png" alt="Mail queue showing a safely processed dry-run result" width="100%" />
+</p>
+
+To send real email, configure a mail provider in `.env`, restart the backend, create a run with **Dry run** disabled, and review every draft and recipient before processing the queue.
+
 ## End-to-End Pipeline
 
 Run the full pipeline from the repository root:
