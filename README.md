@@ -511,6 +511,12 @@ Please follow the [Code of Conduct](CODE_OF_CONDUCT.md) in project spaces.
 
 Do not report vulnerabilities, credentials, personal data exposure, or email-sending security issues through a normal public bug report. Follow [SECURITY.md](SECURITY.md) for responsible disclosure guidance.
 
+## Support the project
+
+If Job Send Crawl is useful to you, you can support ongoing development through the repository's **Sponsor** button once GitHub Sponsors is enabled for the maintainer account.
+
+Contributions, bug reports, documentation improvements, and feedback are equally welcome.
+
 ## License
 
 Licensed under the [Apache License 2.0](LICENSE).
