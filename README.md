@@ -86,40 +86,91 @@ Core packages:
 | Mail providers | SMTP, Resend-compatible provider layer |
 | Tests | Pytest, Vitest |
 
-## Quick Start
+## Quick Start — Docker (recommended)
 
-### 1. Install backend dependencies
+Run the entire stack (frontend, FastAPI backend, Redis, Neo4j, and Qdrant) with Docker Compose. You need Docker Desktop or Docker Engine with the Compose plugin.
+
+### 1. Configure the application
+
+From the repository root:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with the API keys you intend to use (Groq, OpenAI, or Gemini), plus a `GITHUB_TOKEN` for GitHub parsing. Configure mail credentials only when you are ready to send real email. The Compose configuration supplies local Redis, Qdrant, and Neo4j connection addresses for the backend. Neo4j defaults to `neo4j/changeme` for a new local volume; set `NEO4J_PASSWORD` in `.env` and keep it consistent with your Compose environment for other setups. Do not commit `.env`.
+
+### 2. Build and start every service
+
+```bash
+docker compose up --build -d
+docker compose ps
+```
+
+The first build may take a few minutes. Confirm that the backend and frontend are running:
+
+```bash
+docker compose logs --tail=50 backend frontend
+```
+
+The backend should log `Application startup complete`. If a service exits, inspect its logs with `docker compose logs <service>`.
+
+### 3. Open the portal
+
+Visit **http://localhost:8080**. The frontend is a production Vite build served by Nginx, which forwards requests under `/api/` to the FastAPI backend inside the Compose network. No separate `npm run dev` or local Uvicorn process is needed.
+
+### 4. Use the portal step by step
+
+1. **Settings / readiness:** Open **Settings** and check provider/service readiness. Add missing LLM or GitHub credentials to the root `.env`, then recreate the backend: `docker compose up -d --force-recreate backend`. You can also inspect `http://localhost:8000/api/v1/system/status`.
+2. **Create a run:** Open **New Run**. Supply the requested candidate/resume information and GitHub details. Select the relevant pipeline options; prefer **dry-run** while testing.
+3. **Import companies:** In the new-run workflow, provide your company/job data as CSV, JSON, Excel, or a supported Google Sheet URL. Use the import preview to validate the records and correct missing or malformed fields before proceeding.
+4. **Launch and monitor:** Start the run, then use **Dashboard** or **Run Detail** to monitor each pipeline step. The pipeline parses the resume and GitHub projects, builds graph/vector data, ranks project-company matches, and generates drafts. Review any reported errors before retrying or resuming.
+5. **Review candidate and companies:** Open **Candidate** and **Companies** to inspect the extracted candidate information and imported company records.
+6. **Review matches:** Open **Matches** to see the project-to-company recommendations. Check that the suggested projects and links are relevant.
+7. **Review email drafts:** Open **Drafts** and verify the recipient, company, claims, project links, and wording. The current UI may not expose all draft-editing capabilities; edit/review through the API if needed.
+8. **Test the queue safely:** Open **Queue** to review queue/mail processing output. Use **dry-run** first, which avoids sending real emails. Only enable real delivery after validating recipients, drafts, and mail credentials.
+
+**Important:** Some pages and controls are still being improved, and a successful container startup does not guarantee that every pipeline integration is configured. LLM features require valid provider keys; live email sending requires valid mail configuration.
+
+### 5. Stop or troubleshoot
+
+```bash
+docker compose down                 # stop containers; preserve named volumes
+docker compose up --build -d        # rebuild and restart after code changes
+docker compose logs -f backend      # inspect backend logs
+docker compose ps                   # inspect service status and published ports
+```
+
+Avoid `docker compose down -v` unless you intentionally want to delete the local Redis, Neo4j, and Qdrant data volumes.
+
+### Where everything runs after Docker setup
+
+| Service | Local address | Purpose |
+| --- | --- | --- |
+| **Frontend portal** | **http://localhost:8080** | Main user interface (Nginx serving React) |
+| **FastAPI backend** | **http://localhost:8000** | API server |
+| API docs (Swagger UI) | http://localhost:8000/docs | Interactive API reference |
+| API v1 | http://localhost:8000/api/v1 | Backend endpoint prefix |
+| System status | http://localhost:8000/api/v1/system/status | Provider and service readiness |
+| Neo4j Browser | http://localhost:7474 | Knowledge graph UI |
+| Neo4j Bolt | `localhost:7687` | Graph database driver connection |
+| Qdrant dashboard | http://localhost:6333/dashboard | Vector database UI |
+| Qdrant HTTP API | http://localhost:6333 | Vector database API |
+| Redis | `localhost:6379` | Queue and rate-limiting service (not a browser UI) |
+
+All these ports are published to your machine by the default `docker-compose.yml`. They are intended for local development, not for exposure to the public internet without additional security controls.
+
+## Alternative: run backend and frontend outside Docker
+
+For local hot-reload development, install the backend dependencies and start the infrastructure separately, then run Uvicorn and Vite on your host. The Docker quick start above is the preferred option when you simply want the whole application running.
 
 ```bash
 ./setup_uv_env.sh
 cp .env.example .env
-```
-
-The setup script installs `uv` if needed, creates `.venv`, and installs runtime plus test dependencies. Fill in service credentials and API keys in `.env` before running LLM, graph, vector, or mail-backed flows.
-
-### 2. Start infrastructure
-
-```bash
-docker compose up -d
-./scripts/wait_for_services.sh
-```
-
-Local service URLs:
-
-| Service | URL |
-| --- | --- |
-| Neo4j Browser | `http://localhost:7474` |
-| Qdrant | `http://localhost:6333` |
-
-### 3. Run the backend API
-
-```bash
 .venv/bin/python -m uvicorn app.api.main:app --reload
 ```
 
-API root prefix: `http://localhost:8000/api/v1`
-
-### 4. Run the frontend cockpit
+In a separate terminal:
 
 ```bash
 cd frontend
@@ -128,7 +179,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Set `VITE_API_BASE_URL=http://localhost:8000/api/v1` in `frontend/.env.local` when the frontend and backend run on separate ports. For UI-only work, set `VITE_USE_MOCKS=true`.
+For a host-run Vite frontend, set `VITE_API_BASE_URL=http://localhost:8000/api/v1` in `frontend/.env.local`. This alternative requires Redis, Neo4j, and Qdrant to be running and reachable.
 
 Open the portal at `http://localhost:5173` when using the Vite development server. If you start the containerized app with `docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build`, open `http://localhost:8080` instead.
 
