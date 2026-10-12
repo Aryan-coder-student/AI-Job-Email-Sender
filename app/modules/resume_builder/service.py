@@ -66,6 +66,7 @@ class ResumeBuilderService:
             profile=profile.model_copy(deep=True),
             recommendations=recommendations,
             selected_item_ids=chosen_ids,
+            selected_skills=list(selected_skills),
         )
         base_source = source_latex or self.renderer.render(document)
         document.custom_latex = self.renderer.tailor_existing(
@@ -125,7 +126,11 @@ class ResumeBuilderService:
                 for item in getattr(updated.profile, sec)
             }
             selected_items = [all_profile_items[iid] for iid in updated.selected_item_ids if iid in all_profile_items]
-            keywords = list(dict.fromkeys(kw for rec in updated.recommendations for kw in rec.matched_keywords))
+            keywords = (
+                list(updated.selected_skills)
+                if updated.selected_skills is not None
+                else list(dict.fromkeys(kw for rec in updated.recommendations for kw in rec.matched_keywords))
+            )
             if updated.template == "jvs":
                 base_source = (
                     document.custom_latex
