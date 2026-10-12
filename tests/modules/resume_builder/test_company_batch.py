@@ -90,3 +90,19 @@ def test_ranking_triggers_company_resume_generation(monkeypatch, tmp_path):
     RankProjectsStep().execute(context, PipelineOptions(output_dir=tmp_path))
     assert captured[0]["matches"]["Backend Co"][0]["project_name"] == "APIGateway"
     assert (tmp_path / "matches.json").is_file()
+
+
+def test_jvs_template_handles_missing_optional_education_and_experience():
+    from app.modules.resume_builder.latex import LatexRenderer
+    from app.modules.resume_builder.model import ProfessionalProfile, ResumeDocument
+
+    document = ResumeDocument(
+        company_name="Acme",
+        template="jvs",
+        profile=ProfessionalProfile(name="New Graduate", skills=["Python"]),
+    )
+    source = LatexRenderer().render(document)
+    assert r"\section{Education}" not in source
+    assert r"\section{Experience}" not in source
+    assert r"\begin{document}" in source
+    assert r"\end{document}" in source
