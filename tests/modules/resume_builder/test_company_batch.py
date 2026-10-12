@@ -27,15 +27,18 @@ class StubLLM:
         self.calls.append(request)
         marker = "Select company-relevant resume evidence from the JSON below.\n"
         evidence = json.loads(request.messages[1].content.split(marker, 1)[1].split("\n\nOutput schema:", 1)[0])
-        project = evidence["eligible_projects"][0]
+        projects = evidence["eligible_projects"]
         experiences = evidence["candidate"]["experiences"]
         payload = self.response or {
-            "projects": [{"item_id": project["id"], "score": 0.96, "reason": "Relevant factual GitHub project"}],
+            "projects": [
+                {"item_id": project["id"], "score": 0.96, "reason": "Relevant factual project"}
+                for project in projects[:evidence["constraints"]["max_selected_projects"]]
+            ],
             "experiences": [
                 {"item_id": item["id"], "score": 0.8, "reason": "Relevant verified work experience"}
                 for item in experiences
             ],
-            "skills": project["skills"][:1],
+            "skills": evidence["available_skills"],
         }
         return LLMResponse(
             content=json.dumps(payload),
