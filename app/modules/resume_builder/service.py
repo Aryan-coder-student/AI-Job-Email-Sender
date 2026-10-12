@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.modules.resume_builder.interface import LatexCompiler, ResumeBuilderRepository
-from app.modules.resume_builder.latex import LatexRenderer, PdfLatexCompiler
+from app.modules.resume_builder.jvs_template import render_jvs_template
+from app.modules.resume_builder.latex import LatexRenderer, PdfLatexCompiler, escape_latex
 from app.modules.resume_builder.matcher import KeywordRecommendationEngine
 from app.modules.resume_builder.model import JobRequirements, LatexUpdateRequest, ProfessionalProfile, ResumeDocument
 from app.modules.resume_builder.model import ProfileItem
@@ -87,7 +88,32 @@ class ResumeBuilderService:
         changes = {field: getattr(update, field) for field in update.model_fields_set}
         changes["updated_at"] = datetime.now(timezone.utc).isoformat()
         updated = document.model_copy(update=changes)
-        self.renderer.render(updated)
+        if "selected_item_ids" in changes and (update.custom_latex is None or "custom_latex" not in changes or changes.get("custom_latex") is None):
+            all_profile_items = {
+                item.id: item
+                for sec in ("projects", "experiences", "certifications", "publications")
+                for item in getattr(updated.profile, sec)
+            }
+            selected_items = [all_profile_items[iid] for iid in updated.selected_item_ids if iid in all_profile_items]
+            keywords = list(dict.fromkeys(kw for rec in updated.recommendations for kw in rec.matched_keywords))
+            if updated.template == "jvs":
+                base_source = (
+                    document.custom_latex
+                    if (document.custom_latex and "% RESUME-BUILDER:TAILORED-START" in document.custom_latex)
+                    else render_jvs_template(updated.profile, escape_latex)
+                )
+                updated.custom_latex = self.renderer.tailor_existing(
+                    base_source,
+                    company_name=updated.company_name,
+                    role=updated.role,
+                    projects=selected_items,
+                    technical_keywords=keywords,
+                    nontechnical_keywords=[],
+                )
+            else:
+                updated.custom_latex = self.renderer.render(updated.model_copy(update={"custom_latex": None}))
+        else:
+            self.renderer.render(updated)
         return self.repository.save_document(updated)
 
     def latex(self, document: ResumeDocument) -> str:

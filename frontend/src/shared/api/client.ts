@@ -5,6 +5,8 @@ import {
   mockMatches,
   mockCompanies,
   mockResume,
+  mockResumeDocument,
+  mockResumeProfile,
   mockRun,
   mockSystemStatus,
 } from "@/shared/api/mock-data";
@@ -205,18 +207,26 @@ export const api = {
     });
   },
   async resumeProfile(): Promise<ResumeProfile> {
+    if (useMocks) return mockResumeProfile;
     return request<ResumeProfile>("/resume-builder/profile");
   },
+  async importResumeProfile(runId: string): Promise<ResumeProfile> {
+    if (useMocks) return mockResumeProfile;
+    return request<ResumeProfile>(`/resume-builder/profile/import-run/${encodeURIComponent(runId)}`, { method: "POST" });
+  },
   async saveResumeProfile(profile: ResumeProfile): Promise<ResumeProfile> {
+    if (useMocks) return profile;
     return request<ResumeProfile>("/resume-builder/profile", { method: "PUT", body: JSON.stringify(profile) });
   },
   async createResumeDocument(payload: { company_name: string; role: string; description: string; source_latex?: string }): Promise<ResumeDocument> {
+    if (useMocks) return { ...mockResumeDocument, company_name: payload.company_name, role: payload.role };
     return request<ResumeDocument>("/resume-builder/documents", {
       method: "POST",
       body: JSON.stringify({ job: { company_name: payload.company_name, role: payload.role, description: payload.description }, source_latex: payload.source_latex, recommendation_limit: 10, template: "jvs" }),
     });
   },
   async updateResumeDocument(documentId: string, payload: Partial<Pick<ResumeDocument, "custom_latex" | "template" | "section_order" | "selected_item_ids" | "profile">>): Promise<ResumeDocument> {
+    if (useMocks) return { ...mockResumeDocument, ...payload };
     return request<ResumeDocument>(`/resume-builder/documents/${documentId}`, { method: "PUT", body: JSON.stringify(payload) });
   },
   resumeExportUrl(documentId: string, format: "source" | "pdf") {

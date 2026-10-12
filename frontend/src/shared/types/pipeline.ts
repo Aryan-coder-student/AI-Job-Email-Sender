@@ -191,3 +191,50 @@ export interface NewRunFormValues {
   skip_services: boolean;
   clear_graph: boolean;
 }
+
+export interface ResumeProfileItem {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  date?: string;
+  description?: string;
+  skills?: string[];
+  link?: string | null;
+}
+
+export interface ResumeProfile {
+  name: string;
+  headline?: string;
+  summary?: string;
+  email?: string;
+  phone?: string;
+  links?: string[];
+  skills?: string[];
+  experiences?: ResumeProfileItem[];
+  projects?: ResumeProfileItem[];
+  education?: ResumeProfileItem[];
+  certifications?: ResumeProfileItem[];
+  publications?: ResumeProfileItem[];
+}
+
+export interface ResumeRecommendation {
+  item_id: string;
+  section: string;
+  title: string;
+  score: number;
+  matched_keywords: string[];
+  reason: string;
+}
+
+export interface ResumeDocument {
+  id: string;
+  company_name: string;
+  role: string;
+  template: "jvs" | "classic" | "compact";
+  section_order: string[];
+  selected_item_ids: string[];
+  profile: ResumeProfile;
+  recommendations: ResumeRecommendation[];
+  custom_latex?: string | null;
+}
+
