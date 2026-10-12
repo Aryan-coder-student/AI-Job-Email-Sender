@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a reproducible problem in Job Send Crawl
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please remove secrets, personal data, resumes, recipient information, and API keys from all examples and logs.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: A concise description of the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reliable reproduction.
+      placeholder: |
+        1. Start ...
+        2. Open ...
+        3. Submit ...
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Frontend / portal
+        - FastAPI / backend
+        - Pipeline
+        - Resume parsing
+        - GitHub parsing
+        - Company imports
+        - Matching / ranking
+        - Neo4j / graph
+        - Qdrant / vector search
+        - Draft generation
+        - Mail / queue
+        - Docker / setup
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python/Node version, Docker version, browser, and relevant service versions.
+      placeholder: macOS 15, Docker Desktop ..., Python 3.11, Chrome ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Paste only redacted logs. Never include credentials, tokens, resumes, recipient data, or other personal information.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues and pull requests for duplicates.
+          required: true
+        - label: I removed secrets and personal data from this report.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

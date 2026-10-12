@@ -499,6 +499,22 @@ The cockpit covers the main run workflow today. Known next improvements:
 - Add richer graph/match artifact views, including graph paths and zero-score diagnostics.
 - Add a run picker for shared pages such as Candidate, Companies, Matches, Drafts, and Queue.
 
+## Contributing
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, test commands, branch guidance, and pull request expectations.
+
+Before starting larger work, check the existing issues and pull requests to avoid duplicate effort. Issues labeled `good first issue` or `help wanted` are intended to be easier entry points for external contributors.
+
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md) in project spaces.
+
+## Security
+
+Do not report vulnerabilities, credentials, personal data exposure, or email-sending security issues through a normal public bug report. Follow [SECURITY.md](SECURITY.md) for responsible disclosure guidance.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
+
 ## Status
 
 This project is under active development. The safest operating mode is `--dry-run` until mail credentials and queue behavior are verified for your environment.
