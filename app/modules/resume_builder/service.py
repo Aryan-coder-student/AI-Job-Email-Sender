@@ -48,6 +48,36 @@ class ResumeBuilderService:
         )
         return self.repository.save_document(document)
 
+    def create_llm_curated_document(
+        self,
+        job: JobRequirements,
+        *,
+        profile: ProfessionalProfile,
+        recommendations: list,
+        selected_skills: list[str],
+        source_latex: str | None = None,
+    ) -> ResumeDocument:
+        """Render model-selected evidence without calling the keyword matcher."""
+        chosen_ids = [item.item_id for item in recommendations]
+        document = ResumeDocument(
+            company_name=job.company_name,
+            role=job.role,
+            template="jvs",
+            profile=profile.model_copy(deep=True),
+            recommendations=recommendations,
+            selected_item_ids=chosen_ids,
+        )
+        base_source = source_latex or self.renderer.render(document)
+        document.custom_latex = self.renderer.tailor_existing(
+            base_source,
+            company_name=job.company_name,
+            role=job.role,
+            projects=[item for item in document.profile.projects if item.id in chosen_ids],
+            technical_keywords=selected_skills,
+            nontechnical_keywords=[],
+        )
+        return self.repository.save_document(document)
+
     def create_from_pipeline(
         self,
         *,
@@ -57,29 +87,29 @@ class ResumeBuilderService:
         matches: list[dict],
         limit: int,
     ) -> ResumeDocument:
-        matched_names = [str(item.get("project_name") or "") for item in matches[:limit]]
-        projects_by_name = {str(item.get("repo_name") or "").lower(): item for item in github.get("projects") or []}
-        projects: list[ProfileItem] = []
-        technical: list[str] = []
-        nontechnical: list[str] = []
-        for name in matched_names:
-            item = projects_by_name.get(name.lower())
-            if not item:
-                continue
-            stack = item.get("tech_stack") or {}
-            tech = [str(value) for group in ("backend", "frontend", "ai_ml") for value in stack.get(group) or []]
-            tags = [str(value) for value in item.get("non_tech_tags") or []]
-            technical.extend(tech)
-            nontechnical.extend(tags)
-            projects.append(ProfileItem(title=name, description=str(item.get("summary") or ""), skills=tech, link=item.get("repo_link")))
-        profile = self.get_profile().model_copy(update={"projects": projects or self.get_profile().projects})
-        self.save_profile(profile)
-        job = JobRequirements(
-            company_name=str(company.get("company_name") or ""), role=str(company.get("role") or ""),
-            description=str(company.get("job_description") or company.get("company_description") or ""),
-            required_skills=_unique(technical), keywords=_unique(nontechnical),
+        """Legacy single-company entrypoint also uses the LLM; never edits the shared profile."""
+        from app.modules.llm.factory import build_default_llm_router
+        from app.modules.resume_builder.llm_tailoring import CompanyResumeTailor
+
+        result = CompanyResumeTailor(build_default_llm_router()).tailor(
+            profile=self.get_profile(),
+            company=company,
+            github=github,
+            matches=matches,
+            limit=limit,
         )
-        return self.create_document(job, "jvs", limit, source_latex)
+        job = JobRequirements(
+            company_name=str(company.get("company_name") or ""),
+            role=str(company.get("role") or ""),
+            description=str(company.get("job_description") or company.get("company_description") or ""),
+        )
+        return self.create_llm_curated_document(
+            job,
+            profile=result.profile,
+            recommendations=result.recommendations,
+            selected_skills=result.selected_skills,
+            source_latex=source_latex,
+        )
 
     def get_document(self, document_id: str) -> ResumeDocument | None:
         return self.repository.get_document(document_id)
