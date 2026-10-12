@@ -94,7 +94,7 @@ def test_company_matching_produces_isolated_resumes_and_index(tmp_path):
 
 
 def test_missing_matches_do_not_create_unmatched_resume(tmp_path):
-    batch = CompanyResumeBatch(tmp_path, compiler=StubCompiler())
+    batch = CompanyResumeBatch(tmp_path, compiler=StubCompiler(), llm_router=StubLLM())
     resume, github, companies, matches = inputs()
     matches["Vision Co"] = []
     assert set(batch.generate(resume=resume, github=github, companies=companies, matches=matches)) == {"Backend Co"}
