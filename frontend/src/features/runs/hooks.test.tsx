@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PipelineRun } from "@/shared/types/pipeline";
+import { newRunSchema } from "@/shared/api/schemas";
 
 vi.mock("@/shared/api/client", () => ({
   api: {
@@ -121,5 +122,28 @@ describe("run hooks", () => {
 
     unmount();
     expect(secondSource.close).toHaveBeenCalled();
+  });
+});
+
+
+describe("New Run optional max rows", () => {
+  const defaults = {
+    max_repos: 100, max_companies: 25, top_matches: 5,
+    dry_run: true, no_enqueue: false, skip_enrichment: false,
+    skip_services: false, clear_graph: false,
+  };
+
+  it.each([undefined, "", null, Number.NaN])("accepts an empty max rows value (%s)", (max_rows) => {
+    const parsed = newRunSchema.safeParse({ ...defaults, max_rows });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.max_rows).toBeUndefined();
+  });
+
+  it.each([0, -1, 1.5])("rejects invalid max rows (%s)", (max_rows) => {
+    expect(newRunSchema.safeParse({ ...defaults, max_rows }).success).toBe(false);
+  });
+
+  it("accepts a positive row limit", () => {
+    expect(newRunSchema.safeParse({ ...defaults, max_rows: 1000 }).success).toBe(true);
   });
 });

@@ -1,0 +1,18 @@
+# Default maintainer ownership
+* @Aryan-coder-student
+
+# Backend and pipeline
+/app/ @Aryan-coder-student
+/pipeline/ @Aryan-coder-student
+/cli/ @Aryan-coder-student
+/prompts/ @Aryan-coder-student
+/tests/ @Aryan-coder-student
+
+# Frontend
+/frontend/ @Aryan-coder-student
+
+# Project and contributor configuration
+/.github/ @Aryan-coder-student
+/Dockerfile @Aryan-coder-student
+/docker-compose.yml @Aryan-coder-student
+/docker-compose.app.yml @Aryan-coder-student

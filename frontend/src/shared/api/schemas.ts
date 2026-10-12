@@ -6,7 +6,7 @@ export const newRunSchema = z.object({
   companies_url: z.string().url().optional().or(z.literal("")),
   header_row: z.coerce.number().int().min(1).default(1),
   sheet_names: z.string().optional().or(z.literal("")),
-  max_rows: z.coerce.number().int().min(1).optional(),
+  max_rows: z.preprocess((value) => value === "" || value === null || (typeof value === "number" && Number.isNaN(value)) ? undefined : value, z.coerce.number().int().min(1).optional()),
   selected_companies: z.array(z.record(z.unknown())).optional(),
   target_company: z.string().optional().or(z.literal("")),
   recipient_email: z.string().email().optional().or(z.literal("")),
