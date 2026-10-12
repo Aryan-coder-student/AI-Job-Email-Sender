@@ -275,6 +275,7 @@ function mockArtifact<T>(artifactType: ArtifactType): T {
     github: mockGithub satisfies ParsedGitHubProfile,
     graph: {},
     matches: mockMatches satisfies MatchResult[],
+    company_resumes: {} satisfies CompanyResumeIndex,
     drafts: { [mockDraft.company_name]: mockDraft } satisfies EmailDraftMap,
     mail: mockMail satisfies MailQueueResult[],
   };
