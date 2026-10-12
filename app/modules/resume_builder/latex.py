@@ -83,9 +83,9 @@ class LatexRenderer:
                 project_lines.append(rf"\item \textbf{{{escape_latex(item.title)}}} -- {escape_latex(item.description)}")
         parts = [start, rf"\section{{Relevant Projects for {escape_latex(company_name)}}}" if is_jvs else rf"\section*{{Target: {escape_latex(company_name)} -- {escape_latex(role)}}}"]
         if technical_keywords:
-            parts.append(rf"\textbf{{Technical keywords:}} {escape_latex(', '.join(technical_keywords))}\\")
+            parts.append(rf"\textbf{{Relevant skills:}} {escape_latex(', '.join(technical_keywords))}\\")
         if nontechnical_keywords:
-            parts.append(rf"\textbf{{Domain keywords:}} {escape_latex(', '.join(nontechnical_keywords))}")
+            parts.append(rf"\textbf{{Relevant domains:}} {escape_latex(', '.join(nontechnical_keywords))}")
         if project_lines:
             parts.extend(([r"\resumeSubHeadingListStart", *project_lines, r"\resumeSubHeadingListEnd"] if is_jvs else [r"\subsection*{Most relevant projects}", r"\begin{itemize}", *project_lines, r"\end{itemize}"]))
         parts.append(end)
