@@ -45,12 +45,22 @@ def import_pipeline_profile(run_id: str, service: ResumeBuilderService = Depends
 
 @router.post("/recommendations")
 def recommend(payload: RecommendationRequest, service: ResumeBuilderService = Depends(get_service)):
-    return service.recommend(payload.job, payload.limit)
+    try:
+        return service.recommend(payload.job, payload.limit)
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @router.post("/documents")
 def create_document(payload: ResumeDocumentRequest, service: ResumeBuilderService = Depends(get_service)):
-    return service.create_document(payload.job, payload.template, payload.recommendation_limit, payload.source_latex)
+    try:
+        return service.create_document(payload.job, payload.template, payload.recommendation_limit, payload.source_latex)
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @router.post("/documents/from-run/{run_id}")
@@ -65,10 +75,15 @@ def create_document_from_run(run_id: str, payload: PipelineTailorRequest, servic
     if not isinstance(github, dict) or company is None or not isinstance(matches_artifact, (dict, list)):
         raise HTTPException(status_code=404, detail="GitHub, company, or match artifact is missing for this run.")
     matches = matches_artifact.get(payload.company_name, []) if isinstance(matches_artifact, dict) else matches_artifact
-    return service.create_from_pipeline(
-        source_latex=payload.source_latex, company=company, github=github,
-        matches=matches if isinstance(matches, list) else [], limit=payload.recommendation_limit,
-    )
+    try:
+        return service.create_from_pipeline(
+            source_latex=payload.source_latex, company=company, github=github,
+            matches=matches if isinstance(matches, list) else [], limit=payload.recommendation_limit,
+        )
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @router.get("/documents/{document_id}")
