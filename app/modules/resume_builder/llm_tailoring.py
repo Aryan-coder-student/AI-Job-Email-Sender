@@ -15,7 +15,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 
 from app.modules.llm.interface import LLMMessage, LLMRequest
-from app.modules.resume_builder.model import JobRequirements, ProfessionalProfile, ProfileItem, Recommendation
+from app.modules.resume_builder.model import ProfessionalProfile, ProfileItem, Recommendation
 
 
 class SelectedEvidence(BaseModel):
@@ -58,7 +58,7 @@ def _project_skills(project: dict[str, Any]) -> list[str]:
     if not isinstance(stack, dict):
         return []
     return list(dict.fromkeys(
-        skill.strip()
+        skill
         for group in stack.values()
         if isinstance(group, list)
         for value in group
@@ -175,8 +175,8 @@ class CompanyResumeTailor:
         if len(result.projects) > limit:
             raise ValueError("LLM selected more projects than the requested limit.")
 
-        project_items = self._checked_items(result.projects, project_pool, "projects")
-        experience_items = self._checked_items(result.experiences, experience_pool, "experiences")
+        self._checked_items(result.projects, project_pool, "projects")
+        self._checked_items(result.experiences, experience_pool, "experiences")
         allowed_skills = set(available_skills)
         if len(set(result.skills)) != len(result.skills) or any(skill not in allowed_skills for skill in result.skills):
             raise ValueError("LLM selected unknown or duplicate skills; refusing to invent resume claims.")
