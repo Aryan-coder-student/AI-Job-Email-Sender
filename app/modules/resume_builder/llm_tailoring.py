@@ -39,8 +39,8 @@ fixed keyword dictionary, infer technologies, or make up experience.
 Select relevant project and experience item_id values only from the input.
 Choose relevant skills by copying the EXACT spellings from available_skills.
 Never invent achievements, numbers, employers, dates, responsibilities, or skills.
-Rank selected projects by their fit to this company, using match evidence
-as a signal rather than blindly taking the first ranked projects.
+Rank selected projects by their fit to this company. Use ranked match evidence
+when supplied, but do not invent scores or treat it as required for manual resumes.
 Explain every selected item with a short factual reason; use scores 0.0 to 1.0.
 Prefer a focused resume. Include only genuinely relevant evidence.
 Return valid JSON matching the schema, without markdown or commentary.
@@ -87,8 +87,9 @@ class CompanyResumeTailor:
         github: dict[str, Any],
         matches: list[dict[str, Any]],
         limit: int,
+        manual: bool = False,
     ) -> TailoringResult:
-        if not matches:
+        if not manual and not matches:
             raise ValueError("Company requires ranked matches for LLM tailoring.")
         projects_by_name = {
             str(project.get("repo_name") or "").casefold(): project
@@ -121,7 +122,12 @@ class CompanyResumeTailor:
                     "final_score", "graph_score", "embedding_score", "llm_score", "explanation"
                 }},
             })
-        if not project_pool:
+        if manual:
+            # Manual Resume Builder can use verified profile projects directly.
+            # No synthetic ranking, keyword overlap, or fabricated GitHub data.
+            project_pool = {item.id: item for item in profile.projects}
+            rank_evidence = []
+        if not manual and not project_pool:
             raise ValueError("No ranked project has a matching, verifiable GitHub artifact.")
 
         available_skills = list(dict.fromkeys([
@@ -145,6 +151,7 @@ class CompanyResumeTailor:
             },
             "available_skills": available_skills,
             "ranked_matches": rank_evidence,
+            "mode": "manual" if manual else "company_matches",
             "eligible_projects": [item.model_dump() for item in project_pool.values()],
             "constraints": {
                 "max_selected_projects": max(1, limit),
@@ -170,7 +177,7 @@ class CompanyResumeTailor:
             result = selection_parser.parse(response.content)
         except Exception as error:
             raise ValueError("LLM did not return a valid company resume selection.") from error
-        if not result.projects:
+        if not manual and not result.projects:
             raise ValueError("LLM selected no grounded projects; resume was not generated.")
         if len(result.projects) > limit:
             raise ValueError("LLM selected more projects than the requested limit.")
