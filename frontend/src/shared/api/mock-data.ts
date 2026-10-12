@@ -6,6 +6,8 @@ import type {
   ParsedGitHubProfile,
   ParsedResume,
   PipelineRun,
+  ResumeDocument,
+  ResumeProfile,
   SystemStatus,
 } from "@/shared/types/pipeline";
 
@@ -157,3 +159,39 @@ export const mockCompanies: CompanyRecord[] = [
     source_row: 2,
   },
 ];
+
+export const mockResumeProfile: ResumeProfile = {
+  name: "Aryan Pahari",
+  headline: "Full-Stack & Systems Engineer",
+  summary: "Experienced in building scalable backend services and AI agent pipelines.",
+  email: "aryan@example.com",
+  phone: "+1-555-0199",
+  links: ["https://github.com/Aryan-coder-student"],
+  skills: ["Python", "TypeScript", "FastAPI", "React", "Docker", "Neo4j"],
+  experiences: [
+    { id: "exp-1", title: "Software Engineer", subtitle: "Tech Labs", date: "2023 - Present", description: "Architected distributed pipeline and automation platform." },
+  ],
+  projects: [
+    { id: "proj-1", title: "Job Send Crawl", description: "AI-assisted job outreach automation and knowledge graph matching.", skills: ["Python", "Neo4j", "Qdrant", "React"] },
+    { id: "proj-2", title: "Resume Builder", description: "Automated LaTeX resume tailoring and compilation service.", skills: ["LaTeX", "Python", "FastAPI"] },
+  ],
+  education: [
+    { id: "edu-1", title: "B.Tech Computer Science", subtitle: "University", date: "2019 - 2023" },
+  ],
+};
+
+export const mockResumeDocument: ResumeDocument = {
+  id: "doc-mock-123",
+  company_name: "10up",
+  role: "Backend Engineer",
+  template: "jvs",
+  section_order: ["summary", "skills", "experience", "projects", "education"],
+  selected_item_ids: ["proj-1", "proj-2"],
+  profile: mockResumeProfile,
+  recommendations: [
+    { item_id: "proj-1", section: "projects", title: "Job Send Crawl", score: 0.95, matched_keywords: ["Python", "FastAPI"], reason: "Matches Python and FastAPI backend requirements." },
+    { item_id: "proj-2", section: "projects", title: "Resume Builder", score: 0.88, matched_keywords: ["LaTeX", "FastAPI"], reason: "Demonstrates API and templating capabilities." },
+  ],
+  custom_latex: "\\documentclass{article}\n\\begin{document}\nAryan Pahari\n\\end{document}",
+};
+

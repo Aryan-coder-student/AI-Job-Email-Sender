@@ -59,6 +59,40 @@ jobs:
         run: |
           docker build -t job-send-backend:ci .
           docker run --rm job-send-backend:ci python -c "from app.api.main import app; assert app is not None"
+      - name: Smoke test backend PDF compilation
+        run: |
+          docker run --rm job-send-backend:ci python -c "
+          import tempfile
+          from pathlib import Path
+          from app.modules.resume_builder.latex import LatexRenderer, PdfLatexCompiler
+          from app.modules.resume_builder.model import ProfessionalProfile, ProfileItem, ResumeDocument
+          profile = ProfessionalProfile(
+              name='Smoke Test Candidate',
+              headline='Senior Backend Engineer',
+              email='smoke@example.com',
+              phone='+1-555-0100',
+              links=['https://github.com/example'],
+              skills=['Python', 'FastAPI', 'Docker'],
+              experiences=[ProfileItem(title='Senior Engineer', subtitle='Tech Corp', date='2022 - Present', description='Scaled microservices', skills=['Python', 'Docker'])],
+              projects=[ProfileItem(title='Crawler', description='Async crawler', skills=['Python', 'Asyncio'])],
+              education=[ProfileItem(title='BS Computer Science', subtitle='State University', date='2018 - 2022')],
+          )
+          compiler = PdfLatexCompiler()
+          with tempfile.TemporaryDirectory() as tmpdir:
+              # 1. Test classic template
+              doc_classic = ResumeDocument(company_name='Smoke Test Co', profile=profile, template='classic')
+              source_classic = LatexRenderer().render(doc_classic)
+              pdf_classic = compiler.compile(source_classic, Path(tmpdir) / 'classic')
+              assert len(pdf_classic) > 1000, f'Classic PDF compilation failed: size {len(pdf_classic)}'
+
+              # 2. Test JVS template
+              doc_jvs = ResumeDocument(company_name='Smoke Test Co', profile=profile, template='jvs')
+              source_jvs = LatexRenderer().render(doc_jvs)
+              pdf_jvs = compiler.compile(source_jvs, Path(tmpdir) / 'jvs')
+              assert len(pdf_jvs) > 1000, f'JVS PDF compilation failed: size {len(pdf_jvs)}'
+
+          print('Smoke test passed: Both classic and JVS LaTeX templates compiled to valid PDFs.')
+          "
       - name: Build frontend image
         uses: docker/build-push-action@v6
         with:

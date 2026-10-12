@@ -4,7 +4,7 @@ import pytest
 
 from app.modules.resume_builder.latex import LatexRenderer, validate_latex
 from app.modules.resume_builder.matcher import KeywordRecommendationEngine
-from app.modules.resume_builder.model import JobRequirements, ProfessionalProfile, ProfileItem, ResumeDocument
+from app.modules.resume_builder.model import JobRequirements, LatexUpdateRequest, ProfessionalProfile, ProfileItem, ResumeDocument
 from app.modules.resume_builder.repository import JsonResumeBuilderRepository
 from app.modules.resume_builder.service import ResumeBuilderService, profile_from_pipeline_artifact
 
@@ -99,3 +99,79 @@ def test_pipeline_artifact_maps_to_builder_profile():
     assert profile.name == "Aryan"
     assert profile.projects[0].title == "Crawler"
     assert profile.email == "aryan@example.com"
+
+
+def test_toggle_recommendations_updates_custom_latex(tmp_path):
+    project1 = ProfileItem(title="Project Alpha", description="Alpha project description", skills=["Python"])
+    project2 = ProfileItem(title="Project Beta", description="Beta project description", skills=["FastAPI"])
+    custom_profile = ProfessionalProfile(
+        name="Candidate", headline="Dev", email="c@example.com",
+        projects=[project1, project2],
+    )
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled")
+    service.save_profile(custom_profile)
+
+    doc = service.create_document(JobRequirements(company_name="Acme", role="Backend Engineer", required_skills=["Python", "FastAPI"]), "jvs", 5)
+    # Both projects are initially recommended and selected
+    assert "Project Alpha" in doc.custom_latex
+    assert "Project Beta" in doc.custom_latex
+
+    # Deselect Project Beta
+    updated = service.update_document(doc, LatexUpdateRequest(selected_item_ids=[project1.id], custom_latex=None))
+    assert "Project Alpha" in updated.custom_latex
+    assert "Project Beta" not in updated.custom_latex
+
+    # Deselect all
+    updated_none = service.update_document(updated, LatexUpdateRequest(selected_item_ids=[], custom_latex=None))
+    assert "Project Alpha" not in updated_none.custom_latex
+    assert "Project Beta" not in updated_none.custom_latex
+
+    # Re-select Project Beta only
+    updated_beta = service.update_document(updated_none, LatexUpdateRequest(selected_item_ids=[project2.id], custom_latex=None))
+    assert "Project Alpha" not in updated_beta.custom_latex
+    assert "Project Beta" in updated_beta.custom_latex
+
+
+def test_complete_resume_builder_flow(tmp_path):
+    # Step 1: Import profile
+    raw_artifact = {
+        "candidate_name": "Taylor Swift",
+        "summary": "Experienced distributed systems developer.",
+        "skills": ["Go", "Kubernetes", "PostgreSQL"],
+        "experience": [{"company_name": "CloudCo", "description": "Engineered high-throughput event queues"}],
+        "projects": [{"project_name": "MeshNet", "description": "Service mesh in Go", "technologies": ["Go"]}],
+        "links": {"emails": ["taylor@example.com"], "github": "https://github.com/taylor"},
+    }
+    imported_profile = profile_from_pipeline_artifact(raw_artifact)
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled")
+    saved_profile = service.save_profile(imported_profile)
+    assert saved_profile.name == "Taylor Swift"
+
+    # Step 2: Select job & Step 3: Generate resume
+    job = JobRequirements(
+        company_name="Infrastructure Inc",
+        role="Systems Engineer",
+        description="Looking for Go and Kubernetes engineers",
+        required_skills=["Go", "Kubernetes"],
+    )
+    doc = service.create_document(job, template="jvs", limit=5)
+    assert doc.company_name == "Infrastructure Inc"
+    assert "Taylor Swift" in doc.custom_latex
+    assert "MeshNet" in doc.custom_latex
+
+    # Step 4: Edit LaTeX & Step 5: Save
+    modified_latex = doc.custom_latex.replace("Taylor Swift", "Taylor Swift, Lead Engineer")
+    saved_doc = service.update_document(doc, LatexUpdateRequest(custom_latex=modified_latex))
+    assert "Taylor Swift, Lead Engineer" in saved_doc.custom_latex
+
+    # Step 6: Preview (LaTeX source & PDF compilation)
+    source = service.latex(saved_doc)
+    assert "Taylor Swift, Lead Engineer" in source
+    pdf_bytes = service.pdf(saved_doc)
+    assert pdf_bytes.startswith(b"%PDF-")
+
+    # Step 7: Download / Export verification
+    reloaded_doc = service.get_document(saved_doc.id)
+    assert reloaded_doc is not None
+    assert service.latex(reloaded_doc) == modified_latex
+
