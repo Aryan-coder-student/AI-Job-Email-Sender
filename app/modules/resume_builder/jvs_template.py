@@ -14,6 +14,18 @@ def render_jvs_template(profile: ProfessionalProfile, escape) -> str:
         rf"\resumeSubheading{{{escape(item.title)}}}{{{escape(item.date)}}}{{{escape(item.subtitle)}}}{{}}\resumeItemListStart\resumeItem{{{escape(item.description)}}}\resumeItemListEnd"
         for item in profile.experiences
     )
+    # LaTeX itemize environments cannot be empty. Parsed CVs may omit
+    # education or experience; only emit a section when it has entries.
+    education_block = (
+        "\\section{Education}\n\\resumeSubHeadingListStart\n"
+        + education + "\n\\resumeSubHeadingListEnd"
+        if education else ""
+    )
+    experience_block = (
+        "\\section{Experience}\n\\resumeSubHeadingListStart\n"
+        + experience + "\n\\resumeSubHeadingListEnd"
+        if experience else ""
+    )
     return rf"""% JV's Resume Template by Jaskirat Singh (LPPL 1.3c)
 % Self-contained adaptation for AI Job Email Sender
 \documentclass[letterpaper,11pt]{{article}}
@@ -48,14 +60,8 @@ def render_jvs_template(profile: ProfessionalProfile, escape) -> str:
 \begin{{document}}
 \begin{{center}}{{\Huge\scshape {escape(profile.name)}}}\\\vspace{{1pt}}\small {escape(contact)}\end{{center}}
 {escape(profile.summary)}
-\section{{Education}}
-\resumeSubHeadingListStart
-{education}
-\resumeSubHeadingListEnd
-\section{{Experience}}
-\resumeSubHeadingListStart
-{experience}
-\resumeSubHeadingListEnd
+{education_block}
+{experience_block}
 % RESUME-BUILDER:TAILORED-START
 % Company-tailored GitHub projects are inserted here.
 % RESUME-BUILDER:TAILORED-END
