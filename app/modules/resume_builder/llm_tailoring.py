@@ -182,7 +182,10 @@ class CompanyResumeTailor:
             raise ValueError("LLM selected unknown or duplicate skills; refusing to invent resume claims.")
 
         scoped = profile.model_copy(deep=True)
-        scoped.projects = [project_pool[item.item_id] for item in result.projects]
+        scoped.projects = [project_pool[item.item_id].model_copy(deep=True) for item in result.projects]
+        for project in scoped.projects:
+            # The project heading must not add unselected technology keywords.
+            project.skills = [skill for skill in project.skills if skill in result.skills]
         scoped.experiences = [experience_pool[item.item_id] for item in result.experiences]
         scoped.skills = list(result.skills)
         # LLM relevance scores/reasons, never local keyword overlap scores.
