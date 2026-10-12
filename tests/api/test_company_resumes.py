@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 import app.api.v1.routes.company_resumes as company_api
 from app.modules.resume_builder.company_batch import CompanyResumeBatch, company_key
-from tests.modules.resume_builder.test_company_batch import inputs
+from tests.modules.resume_builder.test_company_batch import StubLLM, inputs
 
 
 class StubCompiler:
@@ -14,7 +14,7 @@ class StubCompiler:
 
 
 def test_company_resume_routes_are_scoped_to_pipeline_run(tmp_path, monkeypatch):
-    batch = CompanyResumeBatch(tmp_path, compiler=StubCompiler())
+    batch = CompanyResumeBatch(tmp_path, compiler=StubCompiler(), llm_router=StubLLM())
     resume, github, companies, matches = inputs()
 
     class FakeStore:
