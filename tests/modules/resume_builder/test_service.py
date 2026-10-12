@@ -66,18 +66,43 @@ def test_jvs_is_default_self_contained_template(tmp_path, profile):
     assert r"\input{particulars}" not in document.custom_latex
 
 
-def test_pipeline_uses_ranked_github_projects_and_tags(tmp_path, profile):
+def test_pipeline_uses_llm_selected_verified_evidence_without_mutation(tmp_path, profile, monkeypatch):
+    import json
+
+    from app.modules.llm.interface import LLMResponse
+    from app.modules.resume_builder.llm_tailoring import project_reference
+
+    class StubLLM:
+        def generate(self, request):
+            assert "Build APIs" in request.messages[1].content
+            return LLMResponse(
+                content=json.dumps({
+                    "projects": [{"item_id": project_reference("Crawler"), "score": 0.9, "reason": "Verified API project"}],
+                    "experiences": [],
+                    "skills": ["Python"],
+                }),
+                provider="test-llm", model="test-model",
+            )
+
+    monkeypatch.setattr("app.modules.llm.factory.build_default_llm_router", lambda: StubLLM())
     service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path)
     service.save_profile(profile)
+    original = service.get_profile()
     document = service.create_from_pipeline(
         source_latex=r"\documentclass{article}\begin{document}Base\end{document}",
         company={"company_name": "Acme", "role": "AI Engineer", "job_description": "Build APIs"},
-        github={"projects": [{"repo_name": "Crawler", "summary": "Crawls job UIs", "repo_link": "https://github/x", "tech_stack": {"backend": ["Python"], "frontend": [], "ai_ml": ["LLM"]}, "non_tech_tags": ["recruitment"]}]},
+        github={"projects": [{"repo_name": "Crawler", "summary": "Crawls job UIs",
+                               "repo_link": "https://github/x",
+                               "tech_stack": {"backend": ["Python"], "frontend": [], "ai_ml": ["LLM"]},
+                               "non_tech_tags": ["recruitment"]}]},
         matches=[{"project_name": "Crawler", "final_score": 0.9}], limit=5,
     )
     assert "Crawler" in document.custom_latex
     assert "Python" in document.custom_latex
-    assert "recruitment" in document.custom_latex
+    assert "recruitment" not in document.custom_latex
+    assert document.selected_skills == ["Python"]
+    assert service.get_profile() == original
+
 
 
 def test_service_persists_profile_and_document(tmp_path, profile):
