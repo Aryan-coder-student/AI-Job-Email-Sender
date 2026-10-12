@@ -7,6 +7,7 @@ from app.modules.graph.tasks.runner import run_build_knowledge_graph
 from app.modules.llm.factory import build_default_llm_router
 from app.modules.mail.tasks.runner import run_process_email_queue
 from app.modules.matching.tasks.runner import run_rank_applications
+from app.modules.resume_builder.company_batch import CompanyResumeBatch
 from app.modules.resume.config import ResumeParserConfig
 from app.modules.resume.parser import parse_resume_from_path
 from pipeline.config import PipelineOptions
@@ -103,6 +104,15 @@ class RankProjectsStep(BaseStepHandler):
                 top=options.top_matches,
             )
         context.write_json(context.matches_path, context.matches)
+        # Company resumes are produced immediately after ranking and before outreach.
+        # The batch is scoped to this run and never mutates the shared profile.
+        CompanyResumeBatch(context.output_dir).generate(
+            resume=require_value(context.parsed_resume, "Resume required for company tailoring.").to_dict(),
+            github=require_value(context.parsed_github, "GitHub data required for tailoring.").to_dict(),
+            companies=companies,
+            matches=context.matches,
+            limit=options.top_matches,
+        )
 
 
 class GenerateDraftStep(BaseStepHandler):
@@ -147,6 +157,11 @@ class GenerateDraftStep(BaseStepHandler):
                 recipient_email=recipient_email,
                 enqueue=not options.no_enqueue,
             )
+        resume_index = CompanyResumeBatch(context.output_dir).read_manifest()
+        for company_name, draft in context.drafts.items():
+            if isinstance(draft, dict) and company_name in resume_index:
+                draft["resume_document_id"] = resume_index[company_name]["document_id"]
+                draft["resume_company_key"] = resume_index[company_name]["company_key"]
         context.write_json(context.drafts_path, context.drafts)
 
 
