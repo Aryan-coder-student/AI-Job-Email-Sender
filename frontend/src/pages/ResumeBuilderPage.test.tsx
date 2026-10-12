@@ -12,6 +12,11 @@ vi.mock("@/shared/api/client", () => ({
     importResumeProfile: vi.fn(),
     createResumeDocument: vi.fn(),
     updateResumeDocument: vi.fn(),
+    companyResumes: vi.fn(),
+    generateCompanyResumes: vi.fn(),
+    getCompanyResume: vi.fn(),
+    updateCompanyResume: vi.fn(),
+    companyResumeExportUrl: vi.fn((run: string, key: string, format: string) => `/api/v1/resume-builder/runs/${run}/companies/${key}/${format}`),
     resumeExportUrl: vi.fn((id: string, format: string) => `/api/v1/resume-builder/documents/${id}/${format}`),
   },
 }));
@@ -80,6 +85,7 @@ describe("ResumeBuilderPage", () => {
     vi.clearAllMocks();
     vi.mocked(api.resumeProfile).mockResolvedValue(mockProfile);
     vi.mocked(api.listRuns).mockResolvedValue(mockRuns);
+    vi.mocked(api.companyResumes).mockResolvedValue({});
   });
 
   it("renders profile details and job inputs", async () => {
@@ -195,6 +201,25 @@ describe("ResumeBuilderPage", () => {
       const textarea = screen.getByLabelText("Editable LaTeX") as HTMLTextAreaElement;
       expect(textarea.value).toContain("Updated without Project Alpha");
     });
+  });
+
+  it("opens a matched company resume using its run-scoped export and saves independently", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.companyResumes).mockResolvedValueOnce({
+      "Acme Corp": { company_name: "Acme Corp", company_key: "acme-key", document_id: "doc-123", role: "Backend Engineer", match_count: 2, status: "ready" },
+    });
+    vi.mocked(api.getCompanyResume).mockResolvedValueOnce(mockDocument);
+    vi.mocked(api.updateCompanyResume).mockResolvedValueOnce(mockDocument);
+    renderPage();
+    await screen.findByText("Jane Developer");
+    await user.selectOptions(screen.getByLabelText("Select previous run"), "run-demo-1");
+    await screen.findByText("Acme Corp");
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    await screen.findByRole("checkbox", { name: /Toggle recommendation Project Alpha/ });
+    const iframe = screen.getByTestId("resume-preview-iframe") as HTMLIFrameElement;
+    expect(iframe.src).toContain("/runs/run-demo-1/companies/acme-key/pdf");
+    await user.click(screen.getByRole("button", { name: /Save, validate & preview/i }));
+    expect(api.updateCompanyResume).toHaveBeenCalledWith("run-demo-1", "acme-key", { custom_latex: mockDocument.custom_latex });
   });
 
   it("imports candidate profile from a previous run", async () => {
