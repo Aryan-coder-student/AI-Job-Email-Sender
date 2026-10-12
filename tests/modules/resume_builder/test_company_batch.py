@@ -85,6 +85,8 @@ def test_company_matching_produces_isolated_resumes_and_index(tmp_path):
     assert backend is not None and vision is not None
     assert backend.company_name == "Backend Co"
     assert "APIGateway" in batch.service.latex(backend)
+    assert "FastAPI" in batch.service.latex(backend)
+    assert "Python" not in batch.service.latex(backend)
     assert "ImageModel" not in batch.service.latex(backend)
     assert "ImageModel" in batch.service.latex(vision)
     assert "APIGateway" not in batch.service.latex(vision)
