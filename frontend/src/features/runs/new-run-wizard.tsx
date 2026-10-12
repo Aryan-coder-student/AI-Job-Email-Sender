@@ -272,7 +272,7 @@ function ImportStep({
             <Input placeholder="Sheet1, Sheet2" {...form.register("sheet_names")} />
           </Field>
           <Field label="Max rows" hint="Maximum rows to parse (optional)" error={form.formState.errors.max_rows?.message}>
-            <Input type="number" min={1} placeholder="1000" {...form.register("max_rows", { valueAsNumber: true, setValueAs: (v) => v ? parseInt(v, 10) : undefined })} />
+            <Input type="number" min={1} placeholder="1000" {...form.register("max_rows", { setValueAs: (value: string) => value === "" ? undefined : Number(value) })} />
           </Field>
         </div>
 
