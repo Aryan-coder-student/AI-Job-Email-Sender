@@ -30,8 +30,8 @@ class ResumeBuilderService:
     def recommend(self, job: JobRequirements, limit: int = 10):
         return self.matcher.recommend(self.get_profile(), job, limit)
 
-    def create_document(self, job: JobRequirements, template: str, limit: int, source_latex: str | None = None) -> ResumeDocument:
-        profile = self.get_profile()
+    def create_document(self, job: JobRequirements, template: str, limit: int, source_latex: str | None = None, *, profile: ProfessionalProfile | None = None) -> ResumeDocument:
+        profile = profile if profile is not None else self.get_profile()
         recommendations = self.matcher.recommend(profile, job, limit)
         document = ResumeDocument(
             company_name=job.company_name, role=job.role, template=template,
