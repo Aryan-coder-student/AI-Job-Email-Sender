@@ -141,6 +141,9 @@ class CompanyResumeTailor:
                 "role": str(company.get("role") or ""),
                 "job_description": str(company.get("job_description") or ""),
                 "company_description": str(company.get("company_description") or ""),
+                "required_skills": company.get("required_skills") or [],
+                "additional_requirements": company.get("additional_requirements") or [],
+                "experience_level": company.get("experience_level"),
             },
             "candidate": {
                 "name": profile.name,
