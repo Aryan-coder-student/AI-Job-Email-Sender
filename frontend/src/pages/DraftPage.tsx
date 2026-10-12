@@ -56,7 +56,7 @@ export function DraftPage() {
           </CardHeader>
           <CardContent className="grid gap-3">
             {entries.map(([companyName, draft]) => (
-              <DraftSection key={companyName} companyName={companyName} draft={draft as EmailDraft} />
+              <DraftSection key={companyName} companyName={companyName} draft={draft as EmailDraft} runId={runId} />
             ))}
           </CardContent>
         </Card>
@@ -66,7 +66,7 @@ export function DraftPage() {
   );
 }
 
-function DraftSection({ companyName, draft }: { companyName: string; draft: EmailDraft }) {
+function DraftSection({ companyName, draft, runId }: { companyName: string; draft: EmailDraft; runId: string }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -86,6 +86,12 @@ function DraftSection({ companyName, draft }: { companyName: string; draft: Emai
         <div className="border-t p-3 grid gap-2 text-sm">
           <div><span className="font-semibold">To:</span> {draft.to ?? "—"}</div>
           <div><span className="font-semibold">Subject:</span> {draft.subject ?? "—"}</div>
+          {draft.resume_company_key ? (
+            <a className="text-primary underline underline-offset-4" target="_blank" rel="noreferrer"
+              href={api.companyResumeExportUrl(runId, draft.resume_company_key, "pdf")}>
+              Download tailored resume for {companyName}
+            </a>
+          ) : null}
           <pre className="max-h-60 overflow-auto rounded-md bg-muted p-3 text-xs whitespace-pre-wrap">
             {draft.body_text ?? ""}
           </pre>

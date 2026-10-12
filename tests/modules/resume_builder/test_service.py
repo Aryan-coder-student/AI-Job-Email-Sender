@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from app.modules.resume_builder.latex import LatexRenderer, validate_latex
-from app.modules.resume_builder.matcher import KeywordRecommendationEngine
+from tests.modules.resume_builder.test_company_batch import StubLLM
 from app.modules.resume_builder.model import JobRequirements, LatexUpdateRequest, ProfessionalProfile, ProfileItem, ResumeDocument
 from app.modules.resume_builder.repository import JsonResumeBuilderRepository
 from app.modules.resume_builder.service import ResumeBuilderService, profile_from_pipeline_artifact
@@ -24,13 +24,22 @@ def profile() -> ProfessionalProfile:
     )
 
 
-def test_recommendations_rank_job_overlap(profile):
-    result = KeywordRecommendationEngine().recommend(
-        profile, JobRequirements(company_name="Acme", role="Python backend engineer", required_skills=["FastAPI"]), 5,
+def test_standalone_recommendations_are_llm_selected(tmp_path, profile):
+    model = StubLLM()
+    service = ResumeBuilderService(
+        JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path,
+        llm_router=model,
     )
-    assert result[0].title == "SDE Intern"
-    assert result[0].score > result[1].score
-    assert "fastapi" in result[0].matched_keywords
+    service.save_profile(profile)
+    result = service.recommend(
+        JobRequirements(company_name="Acme", role="Python backend engineer", required_skills=["FastAPI"]), 5,
+    )
+    assert len(model.calls) == 1
+    assert {item.title for item in result} == {"SDE Intern", "Crawler"}
+    assert all(item.matched_keywords == [] for item in result)
+    assert "Python backend engineer" in model.calls[0].messages[1].content
+    assert '"mode": "manual"' in model.calls[0].messages[1].content
+
 
 
 def test_renderer_escapes_profile_and_filters_items(profile):
@@ -58,7 +67,7 @@ def test_existing_latex_is_preserved_and_tailored(profile):
 
 
 def test_jvs_is_default_self_contained_template(tmp_path, profile):
-    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path)
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path, llm_router=StubLLM())
     service.save_profile(profile)
     document = service.create_document(JobRequirements(company_name="Acme", required_skills=["Python"]), "jvs", 5)
     assert "JV's Resume Template" in document.custom_latex
@@ -66,23 +75,48 @@ def test_jvs_is_default_self_contained_template(tmp_path, profile):
     assert r"\input{particulars}" not in document.custom_latex
 
 
-def test_pipeline_uses_ranked_github_projects_and_tags(tmp_path, profile):
+def test_pipeline_uses_llm_selected_verified_evidence_without_mutation(tmp_path, profile, monkeypatch):
+    import json
+
+    from app.modules.llm.interface import LLMResponse
+    from app.modules.resume_builder.llm_tailoring import project_reference
+
+    class StubLLM:
+        def generate(self, request):
+            assert "Build APIs" in request.messages[1].content
+            return LLMResponse(
+                content=json.dumps({
+                    "projects": [{"item_id": project_reference("Crawler"), "score": 0.9, "reason": "Verified API project"}],
+                    "experiences": [],
+                    "skills": ["Python"],
+                }),
+                provider="test-llm", model="test-model",
+            )
+
+    monkeypatch.setattr("app.modules.llm.factory.build_default_llm_router", lambda: StubLLM())
     service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path)
     service.save_profile(profile)
+    original = service.get_profile()
     document = service.create_from_pipeline(
         source_latex=r"\documentclass{article}\begin{document}Base\end{document}",
         company={"company_name": "Acme", "role": "AI Engineer", "job_description": "Build APIs"},
-        github={"projects": [{"repo_name": "Crawler", "summary": "Crawls job UIs", "repo_link": "https://github/x", "tech_stack": {"backend": ["Python"], "frontend": [], "ai_ml": ["LLM"]}, "non_tech_tags": ["recruitment"]}]},
+        github={"projects": [{"repo_name": "Crawler", "summary": "Crawls job UIs",
+                               "repo_link": "https://github/x",
+                               "tech_stack": {"backend": ["Python"], "frontend": [], "ai_ml": ["LLM"]},
+                               "non_tech_tags": ["recruitment"]}]},
         matches=[{"project_name": "Crawler", "final_score": 0.9}], limit=5,
     )
     assert "Crawler" in document.custom_latex
     assert "Python" in document.custom_latex
-    assert "recruitment" in document.custom_latex
+    assert "recruitment" not in document.custom_latex
+    assert document.selected_skills == ["Python"]
+    assert service.get_profile() == original
+
 
 
 def test_service_persists_profile_and_document(tmp_path, profile):
     repository = JsonResumeBuilderRepository(tmp_path)
-    service = ResumeBuilderService(repository, StubCompiler(), tmp_path / "compiled")
+    service = ResumeBuilderService(repository, StubCompiler(), tmp_path / "compiled", llm_router=StubLLM())
     service.save_profile(profile)
     document = service.create_document(JobRequirements(company_name="Acme", required_skills=["Python"]), "classic", 5)
     assert service.get_document(document.id) == document
@@ -108,7 +142,7 @@ def test_toggle_recommendations_updates_custom_latex(tmp_path):
         name="Candidate", headline="Dev", email="c@example.com",
         projects=[project1, project2],
     )
-    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled")
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled", llm_router=StubLLM())
     service.save_profile(custom_profile)
 
     doc = service.create_document(JobRequirements(company_name="Acme", role="Backend Engineer", required_skills=["Python", "FastAPI"]), "jvs", 5)
@@ -143,7 +177,7 @@ def test_complete_resume_builder_flow(tmp_path):
         "links": {"emails": ["taylor@example.com"], "github": "https://github.com/taylor"},
     }
     imported_profile = profile_from_pipeline_artifact(raw_artifact)
-    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled")
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path / "compiled", llm_router=StubLLM())
     saved_profile = service.save_profile(imported_profile)
     assert saved_profile.name == "Taylor Swift"
 
@@ -175,3 +209,39 @@ def test_complete_resume_builder_flow(tmp_path):
     assert reloaded_doc is not None
     assert service.latex(reloaded_doc) == modified_latex
 
+
+
+def test_llm_curated_skills_survive_project_selection_edits(tmp_path):
+    from app.modules.resume_builder.model import Recommendation
+
+    project = ProfileItem(title="API", description="A verified FastAPI project", skills=["FastAPI"])
+    profile = ProfessionalProfile(name="Example Candidate", projects=[project], skills=["FastAPI"])
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path)
+    document = service.create_llm_curated_document(
+        JobRequirements(company_name="Backend Company", role="Backend Engineer"),
+        profile=profile,
+        recommendations=[
+            Recommendation(item_id=project.id, section="projects", title=project.title, score=0.95,
+                           reason="Selected by language model")
+        ],
+        selected_skills=["FastAPI"],
+    )
+    assert document.selected_skills == ["FastAPI"]
+    updated = service.update_document(
+        document,
+        LatexUpdateRequest(selected_item_ids=[], custom_latex=None),
+    )
+    assert r"\resumeProjectHeading{\textbf{API}" not in updated.custom_latex
+    assert "FastAPI" in updated.custom_latex
+    assert service.get_document(document.id).selected_skills == ["FastAPI"]
+
+def test_manual_resume_never_falls_back_to_keywords_when_model_missing(tmp_path, profile, monkeypatch):
+    import app.modules.llm.factory as factory
+    monkeypatch.setattr(factory, "build_default_llm_router", lambda: (_ for _ in ()).throw(RuntimeError("LLM unavailable")))
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path)
+    service.save_profile(profile)
+    with pytest.raises(RuntimeError, match="LLM unavailable"):
+        service.create_document(JobRequirements(company_name="Acme", role="Backend"), "jvs", 5)
+    with pytest.raises(RuntimeError, match="LLM unavailable"):
+        service.recommend(JobRequirements(company_name="Acme", role="Backend"), 5)
+    assert not list((tmp_path / "documents").glob("*.json")) if (tmp_path / "documents").exists() else True

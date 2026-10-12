@@ -93,6 +93,49 @@ jobs:
 
           print('Smoke test passed: Both classic and JVS LaTeX templates compiled to valid PDFs.')
           "
+      - name: Smoke test LLM-selected company PDFs (offline fixture)
+        run: |
+          docker run --rm job-send-backend:ci python -c "
+          import json
+          import tempfile
+          from pathlib import Path
+          from app.modules.llm.interface import LLMResponse
+          from app.modules.resume_builder.company_batch import CompanyResumeBatch
+          class StubLLM:
+              def generate(self, request):
+                  marker = 'Select company-relevant resume evidence from the JSON below.\n'
+                  evidence = json.loads(request.messages[1].content.split(marker, 1)[1].split('\n\nOutput schema:', 1)[0])
+                  project = evidence['eligible_projects'][0]
+                  selected = {'projects': [{'item_id': project['id'], 'score': 0.9, 'reason': 'Matches role'}],
+                              'experiences': [], 'skills': project['skills'][:1]}
+                  return LLMResponse(content=json.dumps(selected), provider='ci-fixture', model='ci-fixture')
+          resume = {'candidate_name': 'Test Candidate', 'skills': ['Python', 'PyTorch'],
+                    'links': {'emails': ['test@example.com']}, 'education': ['BTech Computer Science']}
+          github = {'projects': [
+              {'repo_name': 'APIApp', 'summary': 'FastAPI services',
+               'tech_stack': {'backend': ['FastAPI'], 'frontend': [], 'ai_ml': []}},
+              {'repo_name': 'MLApp', 'summary': 'PyTorch image model',
+               'tech_stack': {'backend': [], 'frontend': [], 'ai_ml': ['PyTorch']}},
+          ]}
+          companies = [{'company_name': 'Backend Co', 'role': 'Backend Engineer'},
+                       {'company_name': 'Vision Co', 'role': 'ML Engineer'}]
+          matches = {'Backend Co': [{'project_name': 'APIApp'}],
+                     'Vision Co': [{'project_name': 'MLApp'}]}
+          with tempfile.TemporaryDirectory() as root:
+              batch = CompanyResumeBatch(Path(root), llm_router=StubLLM())
+              entries = batch.generate(resume=resume, github=github, companies=companies, matches=matches)
+              assert len(entries) == 2
+              sources = []
+              for entry in entries.values():
+                  assert entry['llm_provider'] == 'ci-fixture'
+                  document = batch.service.get_document(entry['document_id'])
+                  sources.append(batch.service.latex(document))
+                  pdf = batch.service.pdf(document)
+                  assert pdf.startswith(b'%PDF-') and len(pdf) > 1000
+              assert 'APIApp' in sources[0] and 'MLApp' not in sources[0]
+              assert 'MLApp' in sources[1] and 'APIApp' not in sources[1]
+          print('Two independently selected company PDFs compiled successfully.')
+          "
       - name: Build frontend image
         uses: docker/build-push-action@v6
         with:

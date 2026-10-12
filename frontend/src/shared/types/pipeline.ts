@@ -22,7 +22,7 @@ export interface PipelineRun {
   logs: string[];
 }
 
-export type ArtifactType = "resume" | "github" | "graph" | "matches" | "drafts" | "mail";
+export type ArtifactType = "resume" | "github" | "graph" | "matches" | "company_resumes" | "drafts" | "mail";
 
 export interface SystemStatus {
   llm: {
@@ -127,6 +127,8 @@ export interface EmailDraft {
   project_name?: string | null;
   status: "draft" | "queued" | "sent" | "failed" | "dry_run";
   metadata: Record<string, unknown>;
+  resume_document_id?: string;
+  resume_company_key?: string;
 }
 
 export type EmailDraftMap = Record<string, EmailDraft>;

@@ -13,12 +13,37 @@ export function ResumeBuilderPage() {
   const { data: runs = [] } = useQuery({ queryKey: ["runs"], queryFn: api.listRuns });
 
   const [selectedRunId, setSelectedRunId] = useState("");
+  const [activeCompanyKey, setActiveCompanyKey] = useState("");
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [description, setDescription] = useState("");
   const [document, setDocument] = useState<ResumeDocument | null>(null);
   const [source, setSource] = useState("");
   const [previewVersion, setPreviewVersion] = useState(0);
+  const { data: companyResumes = {} } = useQuery({
+    queryKey: ["company-resumes", selectedRunId],
+    queryFn: () => api.companyResumes(selectedRunId),
+    enabled: Boolean(selectedRunId),
+  });
+  const generateBatch = useMutation({
+    mutationFn: () => api.generateCompanyResumes(selectedRunId),
+    onSuccess: (entries) => queryClient.setQueryData(["company-resumes", selectedRunId], entries),
+  });
+  const openCompany = useMutation({
+    mutationFn: (key: string) => api.getCompanyResume(selectedRunId, key),
+    onSuccess: (value, key) => {
+      setActiveCompanyKey(key);
+      setDocument(value);
+      setCompany(value.company_name);
+      setRole(value.role);
+      setSource(value.custom_latex || "");
+      setPreviewVersion((version) => version + 1);
+    },
+  });
+  const exportUrl = (format: "source" | "pdf") =>
+    activeCompanyKey
+      ? api.companyResumeExportUrl(selectedRunId, activeCompanyKey, format)
+      : api.resumeExportUrl(document!.id, format);
 
   const importProfile = useMutation({
     mutationFn: (runId: string) => api.importResumeProfile(runId),
@@ -34,6 +59,7 @@ export function ResumeBuilderPage() {
   const create = useMutation({
     mutationFn: api.createResumeDocument,
     onSuccess: async (value) => {
+      setActiveCompanyKey("");
       setDocument(value);
       if (value.custom_latex) {
         setSource(value.custom_latex);
@@ -46,7 +72,9 @@ export function ResumeBuilderPage() {
   });
 
   const save = useMutation({
-    mutationFn: () => api.updateResumeDocument(document!.id, { custom_latex: source }),
+    mutationFn: () => activeCompanyKey
+      ? api.updateCompanyResume(selectedRunId, activeCompanyKey, { custom_latex: source })
+      : api.updateResumeDocument(document!.id, { custom_latex: source }),
     onSuccess: (value) => {
       setDocument(value);
       setPreviewVersion((version) => version + 1);
@@ -54,8 +82,9 @@ export function ResumeBuilderPage() {
   });
 
   const updateSelection = useMutation({
-    mutationFn: (ids: string[]) =>
-      api.updateResumeDocument(document!.id, { selected_item_ids: ids, custom_latex: null }),
+    mutationFn: (ids: string[]) => activeCompanyKey
+      ? api.updateCompanyResume(selectedRunId, activeCompanyKey, { selected_item_ids: ids, custom_latex: null })
+      : api.updateResumeDocument(document!.id, { selected_item_ids: ids, custom_latex: null }),
     onSuccess: async (next) => {
       setDocument(next);
       if (next.custom_latex) {
@@ -73,7 +102,7 @@ export function ResumeBuilderPage() {
   }, [document]);
 
   const activeError =
-    create.error || save.error || updateSelection.error || importProfile.error;
+    create.error || save.error || updateSelection.error || importProfile.error || generateBatch.error || openCompany.error;
 
   const errorMessage = activeError
     ? activeError instanceof Error
@@ -143,6 +172,31 @@ export function ResumeBuilderPage() {
               </div>
             </CardContent>
           </Card>
+
+          {selectedRunId ? (
+            <Card>
+              <CardHeader><CardTitle>Resumes for matched companies</CardTitle></CardHeader>
+              <CardContent className="grid gap-3">
+                <p className="text-xs text-muted-foreground">
+                  Each company receives a separate tailored resume from this run's ranked projects.
+                </p>
+                {Object.values(companyResumes).map((entry) => (
+                  <div key={entry.company_key} className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
+                    <div>
+                      <span className="font-semibold">{entry.company_name}</span>
+                      <span className="block text-xs text-muted-foreground">{entry.role || "Matched role"} · {entry.match_count} matches</span>
+                    </div>
+                    <Button size="sm" variant="outline" disabled={openCompany.isPending}
+                      onClick={() => openCompany.mutate(entry.company_key)}>Open</Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" disabled={generateBatch.isPending}
+                  onClick={() => generateBatch.mutate()}>
+                  {generateBatch.isPending ? "Generating PDFs…" : "Generate / regenerate company resumes"}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>
@@ -260,7 +314,7 @@ export function ResumeBuilderPage() {
                     data-testid="resume-preview-iframe"
                     title="Compiled resume preview"
                     className="h-[620px] w-full rounded-md border border-border bg-white"
-                    src={`${api.resumeExportUrl(document.id, "pdf")}?v=${previewVersion}`}
+                    src={`${exportUrl("pdf")}?v=${previewVersion}`}
                   />
                 ) : (
                   <div className="grid h-[620px] place-items-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
@@ -277,13 +331,13 @@ export function ResumeBuilderPage() {
               {document ? (
                 <>
                   <Button asChild variant="outline">
-                    <a href={api.resumeExportUrl(document.id, "source")} download={`resume-${document.id}.tex`}>
+                    <a href={exportUrl("source")} download={`resume-${document.id}.tex`}>
                       <Download className="mr-2 h-4 w-4" />
                       LaTeX
                     </a>
                   </Button>
                   <Button asChild variant="outline">
-                    <a href={api.resumeExportUrl(document.id, "pdf")} download={`resume-${document.id}.pdf`}>
+                    <a href={exportUrl("pdf")} download={`resume-${document.id}.pdf`}>
                       <Download className="mr-2 h-4 w-4" />
                       PDF
                     </a>
