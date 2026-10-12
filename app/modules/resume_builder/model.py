@@ -59,6 +59,7 @@ class ResumeDocument(BaseModel):
         default_factory=lambda: ["summary", "skills", "experience", "projects", "education", "certifications", "publications"]
     )
     selected_item_ids: list[str] = Field(default_factory=list)
+    selected_skills: list[str] | None = None
     profile: ProfessionalProfile
     recommendations: list[Recommendation] = Field(default_factory=list)
     custom_latex: str | None = None
