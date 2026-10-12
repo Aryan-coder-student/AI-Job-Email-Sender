@@ -70,7 +70,9 @@ class CompanyResumeBatch:
             and matches.get(str(company.get("company_name") or "").strip())
         ]
         if not eligible_companies:
-            raise ValueError("No companies have ranked project matches.")
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            self.manifest_path.write_text("{}\n", encoding="utf-8")
+            return {}
         tailor = CompanyResumeTailor(self._llm_router or build_default_llm_router())
         entries: dict[str, dict[str, Any]] = {}
         for company in eligible_companies:
