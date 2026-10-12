@@ -16,8 +16,9 @@ Job applications are repetitive, but good outreach still needs context. This pro
 4. Build a knowledge graph of candidates, projects, technologies, capabilities, companies, roles, and jobs.
 5. Index projects and jobs in a vector database.
 6. Rank candidate projects against each company using graph, embedding, and LLM scores.
-7. Generate personalized email drafts with project links and company-specific reasoning.
-8. Queue or dry-run email sending from a frontend cockpit or CLI.
+7. Generate a separate company-specific LaTeX resume and PDF for each company with ranked project matches.
+8. Generate personalized email drafts linked to the corresponding company resume.
+9. Queue or dry-run email sending from a frontend cockpit or CLI.
 
 ## Highlights
 
@@ -47,7 +48,8 @@ flowchart LR
 
     Graph --> Ranker[Hybrid project ranker]
     Vectors --> Ranker
-    Ranker --> Drafts[Email draft generator]
+    Ranker --> CompanyResumes[Company-specific PDF resumes]
+    CompanyResumes --> Drafts[Email draft generator]
     Drafts --> Queue[Redis mail queue]
     Queue --> Mail[SMTP or dry-run mail processing]
 
@@ -68,6 +70,7 @@ Core packages:
 | Knowledge graph | `app/modules/graph/` | Graph models, enrichment, Neo4j persistence, and graph scoring. |
 | Vector search | `app/modules/vector/` | Qdrant collections, embeddings, project/job indexing. |
 | Matching | `app/modules/matching/` | Hybrid graph/vector/LLM project ranking. |
+| Company resumes | `app/modules/resume_builder/` | Per-run, per-company tailored LaTeX documents and PDFs. |
 | Email drafts | `app/modules/emails/` | Personalized draft generation and template utilities. |
 | Mail | `app/modules/mail/`, `app/redis/` | Mail sender providers, queue processing, Redis rate limits. |
 | Frontend | `frontend/` | React/Vite dashboard for operating the pipeline. |
@@ -167,8 +170,19 @@ Pipeline outputs are written as JSON artifacts:
 | Parse GitHub | `github_projects_resume.json` |
 | Build graph + vectors | `graph_build.json` |
 | Rank projects | `matches.json` |
+| Generate company resumes (after ranking) | `company_resumes.json`, `company_resumes/documents/*.json`, `company_resumes/compiled/<document_id>/resume.pdf` |
 | Generate drafts | `drafts.json` |
 | Process mail queue | `mail_queue_result.json` |
+
+### Company-specific resumes
+
+Every normal pipeline run generates a **separate resume for each company with at least one ranked project match**, immediately after matching and before outreach draft creation. The source candidate profile is not modified. Each company's generated resume is isolated under its run output directory and can be reviewed or edited independently in the **Resume Builder** page by selecting that run.
+
+LaTeX compilation requires `pdflatex`. The backend Docker image from PR #40 installs it; when running the backend directly on your host, install a compatible TeX Live distribution.
+
+Existing runs can generate resumes from their saved matching artifacts using `POST /api/v1/resume-builder/runs/{run_id}/companies/generate`. You can list, preview, edit, and download each resume at `/api/v1/resume-builder/runs/{run_id}/companies/{company_key}` with the `/pdf` and `/source` exports.
+
+The correct resume document ID and company key are recorded on each matching outreach draft. **Sending the PDF as an email attachment is not automatic**; you must still review attachments before sending. Manual edits can be replaced by an explicit regeneration.
 
 ## API Overview
 
@@ -189,6 +203,10 @@ The FastAPI app currently exposes the run-oriented cockpit API:
 | `PUT` | `/api/v1/runs/{run_id}/drafts` | Update generated drafts. |
 | `POST` | `/api/v1/runs/{run_id}/drafts/enqueue` | Mark generated drafts queued. |
 | `POST` | `/api/v1/runs/{run_id}/mail/process` | Process or dry-run mail queue output. |
+| `GET` | `/api/v1/resume-builder/runs/{run_id}/companies` | List generated company-specific resume artifacts. |
+| `POST` | `/api/v1/resume-builder/runs/{run_id}/companies/generate` | Regenerate resumes for matched companies from saved run artifacts. |
+| `GET`, `PUT` | `/api/v1/resume-builder/runs/{run_id}/companies/{company_key}` | Read or edit one company's resume document. |
+| `GET` | `/api/v1/resume-builder/runs/{run_id}/companies/{company_key}/pdf` | Download or preview that company's PDF. |
 
 ## CLI Reference
 
