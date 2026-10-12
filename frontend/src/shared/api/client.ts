@@ -45,6 +45,8 @@ export type ResumeProfile = {
   certifications?: ResumeProfileItem[]; publications?: ResumeProfileItem[];
 };
 export type ResumeRecommendation = { item_id: string; section: string; title: string; score: number; matched_keywords: string[]; reason: string };
+export type CompanyResumeEntry = { company_name: string; company_key: string; document_id: string; role: string; match_count: number; status: string };
+export type CompanyResumeIndex = Record<string, CompanyResumeEntry>;
 export type ResumeDocument = {
   id: string; company_name: string; role: string; template: "jvs" | "classic" | "compact"; section_order: string[];
   selected_item_ids: string[]; profile: ResumeProfile; recommendations: ResumeRecommendation[]; custom_latex?: string | null;
@@ -205,6 +207,27 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+  async companyResumes(runId: string): Promise<CompanyResumeIndex> {
+    if (useMocks) return {};
+    return request<CompanyResumeIndex>(`/resume-builder/runs/${encodeURIComponent(runId)}/companies`);
+  },
+  async generateCompanyResumes(runId: string): Promise<CompanyResumeIndex> {
+    if (useMocks) return {};
+    return request<CompanyResumeIndex>(`/resume-builder/runs/${encodeURIComponent(runId)}/companies/generate`, { method: "POST" });
+  },
+  async getCompanyResume(runId: string, key: string): Promise<ResumeDocument> {
+    if (useMocks) return { ...mockResumeDocument };
+    return request<ResumeDocument>(`/resume-builder/runs/${encodeURIComponent(runId)}/companies/${encodeURIComponent(key)}`);
+  },
+  async updateCompanyResume(runId: string, key: string, payload: Partial<Pick<ResumeDocument, "custom_latex" | "selected_item_ids" | "profile">>): Promise<ResumeDocument> {
+    if (useMocks) return { ...mockResumeDocument, ...payload };
+    return request<ResumeDocument>(`/resume-builder/runs/${encodeURIComponent(runId)}/companies/${encodeURIComponent(key)}`, {
+      method: "PUT", body: JSON.stringify(payload),
+    });
+  },
+  companyResumeExportUrl(runId: string, key: string, format: "source" | "pdf") {
+    return `${apiBaseUrl}/resume-builder/runs/${encodeURIComponent(runId)}/companies/${encodeURIComponent(key)}/${format}`;
   },
   async resumeProfile(): Promise<ResumeProfile> {
     if (useMocks) return mockResumeProfile;
