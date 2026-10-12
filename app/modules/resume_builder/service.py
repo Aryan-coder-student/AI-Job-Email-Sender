@@ -7,18 +7,17 @@ from pathlib import Path
 from app.modules.resume_builder.interface import LatexCompiler, ResumeBuilderRepository
 from app.modules.resume_builder.jvs_template import render_jvs_template
 from app.modules.resume_builder.latex import LatexRenderer, PdfLatexCompiler, escape_latex
-from app.modules.resume_builder.matcher import KeywordRecommendationEngine
 from app.modules.resume_builder.model import JobRequirements, LatexUpdateRequest, ProfessionalProfile, ResumeDocument
 from app.modules.resume_builder.model import ProfileItem
 from app.modules.resume_builder.repository import JsonResumeBuilderRepository
 
 
 class ResumeBuilderService:
-    def __init__(self, repository: ResumeBuilderRepository, compiler: LatexCompiler, output_dir: Path) -> None:
+    def __init__(self, repository: ResumeBuilderRepository, compiler: LatexCompiler, output_dir: Path, *, llm_router=None) -> None:
         self.repository = repository
         self.compiler = compiler
         self.output_dir = output_dir
-        self.matcher = KeywordRecommendationEngine()
+        self._llm_router = llm_router
         self.renderer = LatexRenderer()
 
     def get_profile(self) -> ProfessionalProfile:
@@ -27,26 +26,46 @@ class ResumeBuilderService:
     def save_profile(self, profile: ProfessionalProfile) -> ProfessionalProfile:
         return self.repository.save_profile(profile)
 
-    def recommend(self, job: JobRequirements, limit: int = 10):
-        return self.matcher.recommend(self.get_profile(), job, limit)
+    def _manual_tailoring(self, profile: ProfessionalProfile, job: JobRequirements, limit: int):
+        """LLM-driven selection; manual resumes never use a keyword heuristic."""
+        from app.modules.llm.factory import build_default_llm_router
+        from app.modules.resume_builder.llm_tailoring import CompanyResumeTailor
 
-    def create_document(self, job: JobRequirements, template: str, limit: int, source_latex: str | None = None, *, profile: ProfessionalProfile | None = None) -> ResumeDocument:
-        profile = profile if profile is not None else self.get_profile()
-        recommendations = self.matcher.recommend(profile, job, limit)
-        document = ResumeDocument(
-            company_name=job.company_name, role=job.role, template=template,
-            profile=profile, recommendations=recommendations,
-            selected_item_ids=[item.item_id for item in recommendations],
+        router = self._llm_router if self._llm_router is not None else build_default_llm_router()
+        return CompanyResumeTailor(router).tailor(
+            profile=profile,
+            company={
+                "company_name": job.company_name,
+                "role": job.role,
+                "job_description": job.description,
+                "company_description": "",
+                "required_skills": job.required_skills,
+                "additional_requirements": job.keywords,
+                "experience_level": job.experience_level,
+            },
+            github={"projects": []},
+            matches=[],
+            limit=limit,
+            manual=True,
         )
-        selected_projects = [item for item in profile.projects if item.id in document.selected_item_ids]
-        base_source = source_latex or self.renderer.render(document)
-        document.custom_latex = self.renderer.tailor_existing(
-            base_source, company_name=job.company_name, role=job.role,
-            projects=selected_projects,
-            technical_keywords=job.required_skills,
-            nontechnical_keywords=job.keywords,
+
+    def recommend(self, job: JobRequirements, limit: int = 10):
+        return self._manual_tailoring(self.get_profile(), job, limit).recommendations
+
+    def create_document(
+        self, job: JobRequirements, template: str, limit: int,
+        source_latex: str | None = None, *, profile: ProfessionalProfile | None = None,
+    ) -> ResumeDocument:
+        active_profile = profile if profile is not None else self.get_profile()
+        tailored = self._manual_tailoring(active_profile, job, limit)
+        return self.create_llm_curated_document(
+            job,
+            profile=tailored.profile,
+            recommendations=tailored.recommendations,
+            selected_skills=tailored.selected_skills,
+            source_latex=source_latex,
+            template=template,
         )
-        return self.repository.save_document(document)
 
     def create_llm_curated_document(
         self,
@@ -56,27 +75,33 @@ class ResumeBuilderService:
         recommendations: list,
         selected_skills: list[str],
         source_latex: str | None = None,
+        template: str = "jvs",
     ) -> ResumeDocument:
-        """Render model-selected evidence without calling the keyword matcher."""
+        """Render model-selected evidence without keyword scoring."""
         chosen_ids = [item.item_id for item in recommendations]
         document = ResumeDocument(
             company_name=job.company_name,
             role=job.role,
-            template="jvs",
+            template=template,
             profile=profile.model_copy(deep=True),
             recommendations=recommendations,
             selected_item_ids=chosen_ids,
             selected_skills=list(selected_skills),
         )
-        base_source = source_latex or self.renderer.render(document)
-        document.custom_latex = self.renderer.tailor_existing(
-            base_source,
-            company_name=job.company_name,
-            role=job.role,
-            projects=[item for item in document.profile.projects if item.id in chosen_ids],
-            technical_keywords=selected_skills,
-            nontechnical_keywords=[],
-        )
+        selected_projects = [item for item in document.profile.projects if item.id in chosen_ids]
+        if template != "jvs" and source_latex is None:
+            # The classic and compact renderers already include selected evidence.
+            document.custom_latex = self.renderer.render(document)
+        else:
+            base_source = source_latex or self.renderer.render(document)
+            document.custom_latex = self.renderer.tailor_existing(
+                base_source,
+                company_name=job.company_name,
+                role=job.role,
+                projects=selected_projects,
+                technical_keywords=selected_skills,
+                nontechnical_keywords=[],
+            )
         return self.repository.save_document(document)
 
     def create_from_pipeline(
@@ -126,11 +151,7 @@ class ResumeBuilderService:
                 for item in getattr(updated.profile, sec)
             }
             selected_items = [all_profile_items[iid] for iid in updated.selected_item_ids if iid in all_profile_items]
-            keywords = (
-                list(updated.selected_skills)
-                if updated.selected_skills is not None
-                else list(dict.fromkeys(kw for rec in updated.recommendations for kw in rec.matched_keywords))
-            )
+            keywords = list(updated.selected_skills or [])
             if updated.template == "jvs":
                 base_source = (
                     document.custom_latex
