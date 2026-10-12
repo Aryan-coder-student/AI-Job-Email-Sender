@@ -200,3 +200,28 @@ def test_complete_resume_builder_flow(tmp_path):
     assert reloaded_doc is not None
     assert service.latex(reloaded_doc) == modified_latex
 
+
+
+def test_llm_curated_skills_survive_project_selection_edits(tmp_path):
+    from app.modules.resume_builder.model import Recommendation
+
+    project = ProfileItem(title="API", description="A verified FastAPI project", skills=["FastAPI"])
+    profile = ProfessionalProfile(name="Example Candidate", projects=[project], skills=["FastAPI"])
+    service = ResumeBuilderService(JsonResumeBuilderRepository(tmp_path), StubCompiler(), tmp_path)
+    document = service.create_llm_curated_document(
+        JobRequirements(company_name="Backend Company", role="Backend Engineer"),
+        profile=profile,
+        recommendations=[
+            Recommendation(item_id=project.id, section="projects", title=project.title, score=0.95,
+                           reason="Selected by language model")
+        ],
+        selected_skills=["FastAPI"],
+    )
+    assert document.selected_skills == ["FastAPI"]
+    updated = service.update_document(
+        document,
+        LatexUpdateRequest(selected_item_ids=[], custom_latex=None),
+    )
+    assert "API" not in updated.custom_latex
+    assert "FastAPI" in updated.custom_latex
+    assert service.get_document(document.id).selected_skills == ["FastAPI"]
